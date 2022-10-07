@@ -27,18 +27,26 @@ else()
 	endif()
 endif()
 
-include_directories(src/headers/
+include_directories(src/core/
 		thirdparty/assimp/include/
 		thirdparty/bullet/src/
 		thirdparty/glad/include/
 		thirdparty/glfw/include/
 		thirdparty/glm/
 		thirdparty/stb/
-		thirdparty/hdrloader/)
+		thirdparty/hdrloader/
+		thirdparty/imgui/
+		thirdparty/imgui/backends/)
 
 file(GLOB PROJECT_CORE src/core/*.h)
 file(GLOB VENDORS_SOURCES
 		thirdparty/glad/src/glad.c
+		thirdparty/imgui/*.h
+		thirdparty/imgui/*.cpp
+		thirdparty/imgui/backends/imgui_impl_glfw.h
+		thirdparty/imgui/backends/imgui_impl_glfw.cpp
+		thirdparty/imgui/backends/imgui_impl_opengl3.h
+		thirdparty/imgui/backends/imgui_impl_opengl3.cpp
 		thirdparty/hdrloader/hdrloader.h
 		thirdparty/hdrloader/hdrloader.cpp)
 file(GLOB PROJECT_HEADERS src/headers/*.hpp)
@@ -72,7 +80,7 @@ add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_CORE} ${PROJECT_HEAD
 		${VENDORS_SOURCES})
 
 target_link_libraries(${PROJECT_NAME} assimp glfw
-		${GLFW_LIBRARIES} ${GLAD_LIBRARIES} )
+		${GLFW_LIBRARIES} ${GLAD_LIBRARIES})
 #		BulletDynamics BulletCollision LinearMath)
 
 set_target_properties(${PROJECT_NAME} PROPERTIES

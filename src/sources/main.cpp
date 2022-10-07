@@ -5,13 +5,17 @@
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "../core/Camera.h"
-#include "../core/Shader.h"
-#include "../core/Model.h"
-#include "../core/Screen.h"
-#include "../core/Utility.h"
-#include "../core/Triangle.h"
-#include "../core/BVH.h"
+#include "imgui.h"
+#include "imgui_impl_glfw.h"
+#include "imgui_impl_opengl3.h"
+
+#include "Camera.h"
+#include "Shader.h"
+#include "Model.h"
+#include "Screen.h"
+#include "Utility.h"
+#include "Triangle.h"
+#include "BVH.h"
 
 #include "hdrloader.h"
 
@@ -57,6 +61,7 @@ GLuint hdrMap;
 int main() {
 
     glfwInit();
+    const char* glsl_version = "#version 150";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -75,7 +80,7 @@ int main() {
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetScrollCallback(window, scroll_callback);
-    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
         std::cout << "Failed to initialize GLAD" << std::endl;
@@ -84,8 +89,6 @@ int main() {
 
     // stbi_set_flip_vertically_on_load(true);
 
-    // 深度测试
-    // -------
     // glEnable(GL_DEPTH_TEST);
 
     CPURandomInit();
@@ -174,9 +177,9 @@ int main() {
 #pragma endregion
 
     int nTriangles = triangles.size();
-    std::cout << "模型读取完成: 共 " << nTriangles << " 个三角面" << std::endl;
+    std::cout << "Scene loading completed: " << nTriangles << " triangle faces in total" << std::endl;
 
-    // 建立 bvh
+    // build bvh node
     BVHNode testNode;
     testNode.left = 255;
     testNode.right = 128;
@@ -184,7 +187,7 @@ int main() {
     testNode.AA = vec3(1, 1, 0);
     testNode.BB = vec3(0, 1, 0);
     std::vector<BVHNode> nodes{testNode};
-//    buildBVH(triangles, nodes, 0, triangles.size() - 1, 8);
+    // buildBVH(triangles, nodes, 0, triangles.size() - 1, 8);
     buildBVHwithSAH(triangles, nodes, 0, triangles.size() - 1, 8);
     int nNodes = nodes.size();
     std::cout << "BVH 建立完成: 共 " << nNodes << " 个节点" << std::endl;
@@ -250,6 +253,24 @@ int main() {
     // 线框模式
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
+    // Setup Dear ImGui context
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO& io = ImGui::GetIO(); (void)io;
+
+    // Setup Dear ImGui style
+    ImGui::StyleColorsDark();
+    //ImGui::StyleColorsLight();
+
+    // Setup Platform/Renderer backends
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+
+    // Our state
+    bool show_demo_window = true;
+    bool show_another_window = false;
+    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
+
     // 渲染循环
     // -------
     while (!glfwWindowShouldClose(window)) {
@@ -263,6 +284,49 @@ int main() {
         // input
         // -----
         processInput(window);
+
+        // imgui
+        // -----
+        ImGui_ImplOpenGL3_NewFrame();
+        ImGui_ImplGlfw_NewFrame();
+        ImGui::NewFrame();
+
+        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+        if (show_demo_window)
+            ImGui::ShowDemoWindow(&show_demo_window);
+
+        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
+        {
+            static float f = 0.0f;
+            static int counter = 0;
+
+            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+            ImGui::Checkbox("Another Window", &show_another_window);
+
+            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+                counter++;
+            ImGui::SameLine();
+            ImGui::Text("counter = %d", counter);
+
+            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+            ImGui::End();
+        }
+
+        // 3. Show another simple window.
+        if (show_another_window)
+        {
+            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+            ImGui::Text("Hello from another window!");
+            if (ImGui::Button("Close Me"))
+                show_another_window = false;
+            ImGui::End();
+        }
 
         // render
         // ------
@@ -312,24 +376,30 @@ int main() {
         }
 
 
-//        // view/projection transformations
-//        glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
-//                                                100.0f);
-//        glm::mat4 view = camera.GetViewMatrix();
-//        ourShader.setMat4("projection", projection);
-//        ourShader.setMat4("view", view);
-//        float customColor = 0.5f;
-//        ourShader.setFloat("customColor", customColor);
-//
-//        // render the loaded model
-//        glm::mat4 model = glm::mat4(1.0f);
-//        model = glm::translate(model,
-//                               glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
-//        model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));    // it's a bit too big for our scene, so scale it down
-//        ourShader.setMat4("model", model);
-//        ourModel.Draw(ourShader);
+       // // view/projection transformations
+       // glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+       //                                         100.0f);
+       // glm::mat4 view = camera.GetViewMatrix();
+       // ourShader.setMat4("projection", projection);
+       // ourShader.setMat4("view", view);
+       // float customColor = 0.5f;
+       // ourShader.setFloat("customColor", customColor);
+       //
+       // // render the loaded model
+       // glm::mat4 model = glm::mat4(1.0f);
+       // model = glm::translate(model,
+       //                        glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
+       // model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));    // it's a bit too big for our scene, so scale it down
+       // ourShader.setMat4("model", model);
+       // ourModel.Draw(ourShader);
+       //
+       // screen.DrawScreen();
 
-//        screen.DrawScreen();
+        ImGui::Render();
+        int display_w, display_h;
+        glfwGetFramebufferSize(window, &display_w, &display_h);
+        glViewport(0, 0, display_w, display_h);
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
         // -------------------------------------------------------------------------------
@@ -378,22 +448,24 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
 // glfw: whenever the mouse moves, this callback is called
 // -------------------------------------------------------
 void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
-    float xpos = static_cast<float>(xposIn);
-    float ypos = static_cast<float>(yposIn);
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
+        float xpos = static_cast<float>(xposIn);
+        float ypos = static_cast<float>(yposIn);
 
-    if (firstMouse) {
+        if (firstMouse) {
+            lastX = xpos;
+            lastY = ypos;
+            firstMouse = false;
+        }
+
+        float xoffset = xpos - lastX;
+        float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+
         lastX = xpos;
         lastY = ypos;
-        firstMouse = false;
+
+        camera.ProcessMouseMovement(xoffset, yoffset);
     }
-
-    float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
-
-    lastX = xpos;
-    lastY = ypos;
-
-    camera.ProcessMouseMovement(xoffset, yoffset);
 }
 
 // glfw: whenever the mouse scroll wheel scrolls, this callback is called
