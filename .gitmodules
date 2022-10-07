@@ -3,3 +3,7 @@
 	path = thirdparty/glad
 	url = https://github.com/Dav1dde/glad.git
 	branch = c
+[submodule "thirdparty/glfw"]
+	path = thirdparty/glfw
+	url = https://github.com/glfw/glfw.git
+	branch = 3.3-stable
