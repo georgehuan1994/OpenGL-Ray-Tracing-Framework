@@ -5,10 +5,6 @@
 #ifndef TINY_GL_PATHTRACER_CAMERA_H
 #define TINY_GL_PATHTRACER_CAMERA_H
 
-#include <glad/glad.h>
-#include <glm/glm.hpp>
-#include <glm/gtc/matrix_transform.hpp>
-
 #include <vector>
 
 enum Camera_Movement {
@@ -120,9 +116,7 @@ public:
 
     void ProcessScreenRatio(int screenWidth, int screenHeight) {
         ScreenRatio = (float)screenWidth / (float)screenHeight;
-        halfW = halfH * ScreenRatio;
-        LeftBottomCorner = Front - halfW * Right - halfH * Up;
-        LoopNum = 0;
+        updateCameraVectors();
     }
 
     void LoopIncrease() {

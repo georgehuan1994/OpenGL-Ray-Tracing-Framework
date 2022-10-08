@@ -5,9 +5,6 @@
 #ifndef SCREEN_H
 #define SCREEN_H
 
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-
 const float ScreenVertices[] = {
         -1.0f, 1.0f,   0.0f, 1.0f,
         -1.0f, -1.0f,  0.0f, 0.0f,
@@ -91,6 +88,18 @@ public:
         glDeleteFramebuffers(1, &framebuffer);
         glDeleteTextures(1, &textureColorbuffer);
     }
+
+    unsigned int GetTextureColorBufferId() const {
+        return framebuffer;
+    }
+
+    void Resize(int SCR_WIDTH, int SCR_HEIGHT) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, nullptr);
+        unBind();
+    }
+
 private:
     unsigned int framebuffer;
     unsigned int textureColorbuffer;
@@ -105,6 +114,12 @@ public:
         fbo[1].configuration(SCR_WIDTH, SCR_HEIGHT);
         currentIndex = 0;
     }
+
+    void Resize(int SCR_WIDTH, int SCR_HEIGHT) {
+        fbo[0].Resize(SCR_WIDTH, SCR_HEIGHT);
+        fbo[1].Resize(SCR_WIDTH, SCR_HEIGHT);
+    }
+
     void setCurrentBuffer(int LoopNum) {
         int histIndex = LoopNum % 2;
         int curIndex = (histIndex == 0 ? 1 : 0);
@@ -116,6 +131,12 @@ public:
         int histIndex = LoopNum % 2;
         int curIndex = (histIndex == 0 ? 1 : 0);
         fbo[curIndex].BindAsTexture();
+    }
+
+    unsigned int getCurrentTexture(int LoopNum) {
+        int histIndex = LoopNum % 2;
+        int curIndex = (histIndex == 0 ? 1 : 0);
+        return fbo[curIndex].GetTextureColorBufferId();
     }
 
     void Delete() {

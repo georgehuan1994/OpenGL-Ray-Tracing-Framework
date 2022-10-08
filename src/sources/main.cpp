@@ -34,6 +34,8 @@ void processInput(GLFWwindow *window);
 // settings
 const unsigned int SCR_WIDTH = 512;
 const unsigned int SCR_HEIGHT = 512;
+const unsigned int SCENE_WIDTH = 512;
+const unsigned int SCENE_HEIGHT = 512;
 
 // camera
 Camera camera((float) SCR_WIDTH / (float) SCR_HEIGHT, glm::vec3(0.0f, 0.0f, 7.0f));
@@ -190,7 +192,7 @@ int main() {
     // buildBVH(triangles, nodes, 0, triangles.size() - 1, 8);
     buildBVHwithSAH(triangles, nodes, 0, triangles.size() - 1, 8);
     int nNodes = nodes.size();
-    std::cout << "BVH 建立完成: 共 " << nNodes << " 个节点" << std::endl;
+    std::cout << "BVH building completed: " << nNodes << " nodes in total" << std::endl;
 
     // 编码三角形数据
     std::vector<Triangle_encoded> triangles_encoded(nTriangles);
@@ -291,48 +293,48 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-
-        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-        {
-            static float f = 0.0f;
-            static int counter = 0;
-
-            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-            ImGui::Checkbox("Another Window", &show_another_window);
-
-            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-                counter++;
-            ImGui::SameLine();
-            ImGui::Text("counter = %d", counter);
-
-            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-            ImGui::End();
-        }
-
-        // 3. Show another simple window.
-        if (show_another_window)
-        {
-            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-            ImGui::Text("Hello from another window!");
-            if (ImGui::Button("Close Me"))
-                show_another_window = false;
-            ImGui::End();
-        }
+//        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+//        if (show_demo_window)
+//            ImGui::ShowDemoWindow(&show_demo_window);
+//
+//        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
+//        {
+//            static float f = 0.0f;
+//            static int counter = 0;
+//
+//            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+//
+//            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+//            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+//            ImGui::Checkbox("Another Window", &show_another_window);
+//
+//            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+//            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+//
+//            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+//                counter++;
+//            ImGui::SameLine();
+//            ImGui::Text("counter = %d", counter);
+//
+//            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+//            ImGui::End();
+//        }
+//
+//        // 3. Show another simple window.
+//        if (show_another_window)
+//        {
+//            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+//            ImGui::Text("Hello from another window!");
+//            if (ImGui::Button("Close Me"))
+//                show_another_window = false;
+//            ImGui::End();
+//        }
 
         // render
         // ------
         camera.LoopIncrease();
-        std::cout << "\r";
-        std::cout << std::fixed << std::setprecision(2) << "FPS : " << fps << "    迭代次数: " << camera.LoopNum;
+//        std::cout << "\r";
+//        std::cout << std::fixed << std::setprecision(2) << "FPS : " << fps << "    迭代次数: " << camera.LoopNum;
 
         {
             screenBuffer.setCurrentBuffer(camera.LoopNum);
@@ -371,13 +373,21 @@ int main() {
 
             ScreenShader.use();
             screenBuffer.setCurrentAsTexture(camera.LoopNum);
+
             ScreenShader.setInt("screenTexture", 0);
             screen.DrawScreen();
+
+            ImGui::Begin("Scene View");
+            ImGui::Text("pointer = %p", 1);
+            ImGui::Text("size = %d x %d", width/2, height/2);
+            ImGui::Image((void*)(intptr_t)screenBuffer.getCurrentTexture(camera.LoopNum),
+                         ImVec2(width/2, height/2), ImVec2(0, 1),ImVec2(1, 0));
+            ImGui::End();
         }
 
 
        // // view/projection transformations
-       // glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) SCR_WIDTH / (float) SCR_HEIGHT, 0.1f,
+       // glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) WINDOW_WIDTH / (float) WINDOW_HEIGHT, 0.1f,
        //                                         100.0f);
        // glm::mat4 view = camera.GetViewMatrix();
        // ourShader.setMat4("projection", projection);
@@ -396,9 +406,9 @@ int main() {
        // screen.DrawScreen();
 
         ImGui::Render();
-        int display_w, display_h;
-        glfwGetFramebufferSize(window, &display_w, &display_h);
-        glViewport(0, 0, display_w, display_h);
+//        int display_w, display_h;
+//        glfwGetFramebufferSize(window, &display_w, &display_h);
+//        glViewport(0, 0, display_w, display_h);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -409,6 +419,10 @@ int main() {
 
     // glfw: terminate, clearing all previously allocated GLFW resources.
     // ------------------------------------------------------------------
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplGlfw_Shutdown();
+    ImGui::DestroyContext();
+
     glfwTerminate();
 
     screenBuffer.Delete();
@@ -441,29 +455,30 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
     // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
     glfwGetFramebufferSize(window, &width, &height);
-    glViewport(0, 0, width, height);
     camera.ProcessScreenRatio(width, height);
+    screenBuffer.Resize(width, height);
+    glViewport(0, 0, width, height);
 }
 
 // glfw: whenever the mouse moves, this callback is called
 // -------------------------------------------------------
 void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
-    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
-        float xpos = static_cast<float>(xposIn);
-        float ypos = static_cast<float>(yposIn);
+    float xpos = static_cast<float>(xposIn);
+    float ypos = static_cast<float>(yposIn);
 
-        if (firstMouse) {
-            lastX = xpos;
-            lastY = ypos;
-            firstMouse = false;
-        }
-
-        float xoffset = xpos - lastX;
-        float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
-
+    if (firstMouse) {
         lastX = xpos;
         lastY = ypos;
+        firstMouse = false;
+    }
 
+    float xoffset = xpos - lastX;
+    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+
+    lastX = xpos;
+    lastY = ypos;
+
+    if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
         camera.ProcessMouseMovement(xoffset, yoffset);
     }
 }
