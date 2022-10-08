@@ -9,6 +9,8 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
+#include "AppGUI.h"
+
 #include "Camera.h"
 #include "Shader.h"
 #include "Model.h"
@@ -34,8 +36,10 @@ void processInput(GLFWwindow *window);
 // settings
 const unsigned int SCR_WIDTH = 512;
 const unsigned int SCR_HEIGHT = 512;
-const unsigned int SCENE_WIDTH = 512;
-const unsigned int SCENE_HEIGHT = 512;
+// const unsigned int SCENE_WIDTH = 512;
+// const unsigned int SCENE_HEIGHT = 512;
+
+#define RENDER_SCALE 0.5
 
 // camera
 Camera camera((float) SCR_WIDTH / (float) SCR_HEIGHT, glm::vec3(0.0f, 0.0f, 7.0f));
@@ -63,7 +67,7 @@ GLuint hdrMap;
 int main() {
 
     glfwInit();
-    const char* glsl_version = "#version 150";
+    const char *glsl_version = "#version 150";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -103,8 +107,9 @@ int main() {
     // Shader ourShader("../../src/shaders/vertexShader.glsl",
     //                  "../../src/shaders/fragmentShader.glsl");
 
-    Shader RayTracerShader("../../src/shaders/RayTracerVertexShader.glsl","../../src/shaders/RayTracerFragmentShader.glsl");
-    Shader ScreenShader("../../src/shaders/ScreenVertexShader.glsl","../../src/shaders/ScreenFragmentShader.glsl");
+    Shader RayTracerShader("../../src/shaders/RayTracerVertexShader.glsl",
+                           "../../src/shaders/RayTracerFragmentShader.glsl");
+    Shader ScreenShader("../../src/shaders/ScreenVertexShader.glsl", "../../src/shaders/ScreenFragmentShader.glsl");
 
     // load models
     // -----------
@@ -114,11 +119,11 @@ int main() {
 
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
-    glViewport(0, 0, width, height);
+    glViewport(0, 0, width * RENDER_SCALE, height * RENDER_SCALE);
 
     Screen screen;
     screen.InitScreenBind();
-    screenBuffer.Init(width, height);
+    screenBuffer.Init(width * RENDER_SCALE, height * RENDER_SCALE);
 
     RayTracerShader.use();
 
@@ -138,43 +143,43 @@ int main() {
     cornell_box_light.baseColor = vec3(1, 1, 1);
     cornell_box_light.emissive = vec3(15, 15, 15);
 
-    // 上
-    getTriangle(quad.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-
-    // 下
-    getTriangle(quad.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 0, 0), vec3( 0 ,-5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-
-    // 后
-    getTriangle(quad.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 0, 0), vec3( 0 ,0, -11), vec3(11.1, 11.1, 0.2)), false);
-
-    // 左
-    getTriangle(quad.meshes, triangles, cornell_box_green,
-                getTransformMatrix(vec3(0, 0, 0), vec3( -5.5,0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-
-    // 右
-    getTriangle(quad.meshes, triangles, cornell_box_red,
-                getTransformMatrix(vec3(0, 0, 0), vec3( 5.5,0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-
-    // 灯
-    getTriangle(quad.meshes, triangles, cornell_box_light,
-                getTransformMatrix(vec3(0, 0, 0), vec3( 0 ,5.49, -5.5), vec3(2.6, 0.1, 2.1)), false);
-
-    // cube
-    getTriangle(quad.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 15, 0), vec3(-1.65, -2.2, -7.5), vec3(3.2, 6.6, 3.2)), false);
-//    getTriangle(quad.meshes, triangles, cornell_box_white,
-//                getTransformMatrix(vec3(0, -18, 0), vec3(1.65, -3.9, -4.65), vec3(3.2, 3.2, 3.2)), false);
+//     // 上
+//     getTriangle(quad.meshes, triangles, cornell_box_white,
+//                 getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
+//
+//     // 下
+//     getTriangle(quad.meshes, triangles, cornell_box_white,
+//                 getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
+//
+//     // 后
+//     getTriangle(quad.meshes, triangles, cornell_box_white,
+//                 getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -11), vec3(11.1, 11.1, 0.2)), false);
+//
+//     // 左
+//     getTriangle(quad.meshes, triangles, cornell_box_green,
+//                 getTransformMatrix(vec3(0, 0, 0), vec3(-5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
+//
+//     // 右
+//     getTriangle(quad.meshes, triangles, cornell_box_red,
+//                 getTransformMatrix(vec3(0, 0, 0), vec3(5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
+//
+//     // 灯
+//     getTriangle(quad.meshes, triangles, cornell_box_light,
+//                 getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.49, -5.5), vec3(2.6, 0.1, 2.1)), false);
+//
+//     // cube
+//     getTriangle(quad.meshes, triangles, cornell_box_white,
+//                 getTransformMatrix(vec3(0, 15, 0), vec3(-1.65, -2.2, -7.5), vec3(3.2, 6.6, 3.2)), false);
+// //    getTriangle(quad.meshes, triangles, cornell_box_white,
+// //                getTransformMatrix(vec3(0, -18, 0), vec3(1.65, -3.9, -4.65), vec3(3.2, 3.2, 3.2)), false);
 
     // sphere
     getTriangle(sphere.meshes, triangles, cornell_box_white,
                 getTransformMatrix(vec3(0, 0, 0), vec3(1.65, -3.9, -5), vec3(3.2, 3.2, 3.2)), false);
 
-    // bunny
-//    getTriangle(bunny.meshes, triangles, cornell_box_white,
-//                getTransformMatrix(vec3(0, 0, 0), vec3(2.5, -6.4, -5), vec3(3.2, 3.2, 3.2)), false);
+   // bunny
+   // getTriangle(bunny.meshes, triangles, cornell_box_white,
+   //             getTransformMatrix(vec3(0, 0, 0), vec3(2.5, -6.4, -5), vec3(3.2, 3.2, 3.2)), false);
 
 #pragma endregion
 
@@ -231,7 +236,8 @@ int main() {
     GLuint tbo0;
     glGenBuffers(1, &tbo0);
     glBindBuffer(GL_TEXTURE_BUFFER, tbo0);
-    glBufferData(GL_TEXTURE_BUFFER, triangles_encoded.size() * sizeof(Triangle_encoded), &triangles_encoded[0],GL_STATIC_DRAW);
+    glBufferData(GL_TEXTURE_BUFFER, triangles_encoded.size() * sizeof(Triangle_encoded), &triangles_encoded[0],
+                 GL_STATIC_DRAW);
     glGenTextures(1, &trianglesTextureBuffer);
     glBindTexture(GL_TEXTURE_BUFFER, trianglesTextureBuffer);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo0);
@@ -258,7 +264,8 @@ int main() {
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO &io = ImGui::GetIO();
+    (void) io;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -293,42 +300,49 @@ int main() {
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-//        // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-//        if (show_demo_window)
-//            ImGui::ShowDemoWindow(&show_demo_window);
-//
-//        // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-//        {
-//            static float f = 0.0f;
-//            static int counter = 0;
-//
-//            ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-//
-//            ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-//            ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-//            ImGui::Checkbox("Another Window", &show_another_window);
-//
-//            ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-//            ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-//
-//            if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-//                counter++;
-//            ImGui::SameLine();
-//            ImGui::Text("counter = %d", counter);
-//
-//            ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-//            ImGui::End();
-//        }
-//
-//        // 3. Show another simple window.
-//        if (show_another_window)
-//        {
-//            ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-//            ImGui::Text("Hello from another window!");
-//            if (ImGui::Button("Close Me"))
-//                show_another_window = false;
-//            ImGui::End();
-//        }
+        ShowAppMainMenuBar();
+
+
+
+       // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
+       if (show_demo_window)
+           ImGui::ShowDemoWindow(&show_demo_window);
+
+       // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
+       {
+           static float f = 0.0f;
+           static int counter = 0;
+
+           ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
+
+           ImGui::Text("pointer = %p", 1);
+           ImGui::Text("size = %d x %d", width / 4, height / 4);
+
+           ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
+           ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
+           ImGui::Checkbox("Another Window", &show_another_window);
+
+           ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
+           ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
+
+           if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
+               counter++;
+           ImGui::SameLine();
+           ImGui::Text("counter = %d", counter);
+
+           ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+           ImGui::End();
+       }
+
+       // 3. Show another simple window.
+       if (show_another_window)
+       {
+           ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
+           ImGui::Text("Hello from another window!");
+           if (ImGui::Button("Close Me"))
+               show_another_window = false;
+           ImGui::End();
+       }
 
         // render
         // ------
@@ -375,40 +389,38 @@ int main() {
             screenBuffer.setCurrentAsTexture(camera.LoopNum);
 
             ScreenShader.setInt("screenTexture", 0);
-            screen.DrawScreen();
+            // screen.DrawScreen();
 
+            glfwGetFramebufferSize(window, &width, &height);
+            ImGui::SetNextWindowSize(ImVec2(width / 4, height / 4));
             ImGui::Begin("Scene View");
-            ImGui::Text("pointer = %p", 1);
-            ImGui::Text("size = %d x %d", width/2, height/2);
-            ImGui::Image((void*)(intptr_t)screenBuffer.getCurrentTexture(camera.LoopNum),
-                         ImVec2(width/2, height/2), ImVec2(0, 1),ImVec2(1, 0));
+            ImGui::SetNextItemWidth(width / 4);
+            ImGui::Image((void *) (intptr_t) screenBuffer.getCurrentTexture(camera.LoopNum),
+                         ImVec2(width / 4, height / 4), ImVec2(0, 1), ImVec2(1, 0));
             ImGui::End();
         }
 
 
-       // // view/projection transformations
-       // glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) WINDOW_WIDTH / (float) WINDOW_HEIGHT, 0.1f,
-       //                                         100.0f);
-       // glm::mat4 view = camera.GetViewMatrix();
-       // ourShader.setMat4("projection", projection);
-       // ourShader.setMat4("view", view);
-       // float customColor = 0.5f;
-       // ourShader.setFloat("customColor", customColor);
-       //
-       // // render the loaded model
-       // glm::mat4 model = glm::mat4(1.0f);
-       // model = glm::translate(model,
-       //                        glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
-       // model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));    // it's a bit too big for our scene, so scale it down
-       // ourShader.setMat4("model", model);
-       // ourModel.Draw(ourShader);
-       //
-       // screen.DrawScreen();
+        // // view/projection transformations
+        // glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) WINDOW_WIDTH / (float) WINDOW_HEIGHT, 0.1f,
+        //                                         100.0f);
+        // glm::mat4 view = camera.GetViewMatrix();
+        // ourShader.setMat4("projection", projection);
+        // ourShader.setMat4("view", view);
+        // float customColor = 0.5f;
+        // ourShader.setFloat("customColor", customColor);
+        //
+        // // render the loaded model
+        // glm::mat4 model = glm::mat4(1.0f);
+        // model = glm::translate(model,
+        //                        glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
+        // model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));    // it's a bit too big for our scene, so scale it down
+        // ourShader.setMat4("model", model);
+        // ourModel.Draw(ourShader);
+        //
+        // screen.DrawScreen();
 
         ImGui::Render();
-//        int display_w, display_h;
-//        glfwGetFramebufferSize(window, &display_w, &display_h);
-//        glViewport(0, 0, display_w, display_h);
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
         // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
@@ -455,9 +467,9 @@ void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
     // make sure the viewport matches the new window dimensions; note that width and
     // height will be significantly larger than specified on retina displays.
     glfwGetFramebufferSize(window, &width, &height);
-    camera.ProcessScreenRatio(width, height);
-    screenBuffer.Resize(width, height);
-    glViewport(0, 0, width, height);
+    camera.ProcessScreenRatio(width * RENDER_SCALE, height * RENDER_SCALE);
+    screenBuffer.Resize(width * RENDER_SCALE, height * RENDER_SCALE);
+    glViewport(0, 0, width * RENDER_SCALE, height * RENDER_SCALE);
 }
 
 // glfw: whenever the mouse moves, this callback is called
