@@ -542,7 +542,9 @@ static void ImGui_ImplGlfw_UpdateMouseData()
     {
         // (Optional) Set OS mouse position from Dear ImGui if requested (rarely used, only when ImGuiConfigFlags_NavEnableSetMousePos is enabled by user)
         if (io.WantSetMousePos)
+        {
             glfwSetCursorPos(bd->Window, (double)io.MousePos.x, (double)io.MousePos.y);
+        }
 
         // (Optional) Fallback to provide mouse position when focused (ImGui_ImplGlfw_CursorPosCallback already provides this when hovered or captured)
         if (is_app_focused && bd->MouseWindow == NULL)
@@ -642,8 +644,14 @@ void ImGui_ImplGlfw_NewFrame()
     glfwGetWindowSize(bd->Window, &w, &h);
     glfwGetFramebufferSize(bd->Window, &display_w, &display_h);
     io.DisplaySize = ImVec2((float)w, (float)h);
+
     if (w > 0 && h > 0)
         io.DisplayFramebufferScale = ImVec2((float)display_w / (float)w, (float)display_h / (float)h);
+
+#if defined(__APPLE__)
+    // io.DisplayFramebufferScale = ImVec2(1.0f, 1.0f);
+    // io.DisplaySize = ImVec2((float)display_w, (float)display_h);
+#endif
 
     // Setup time step
     double current_time = glfwGetTime();

@@ -113,8 +113,8 @@ int main() {
 
     // load models
     // -----------
-//    Model sphere("../../resources/objects/sphere.obj");
-//    Model quad("../../resources/objects/quad.obj");
+    Model sphere("../../resources/objects/sphere.obj");
+    Model quad("../../resources/objects/quad.obj");
     Model bunny("../../resources/objects/bunny.obj");
     Model plate("../../resources/objects/plate.obj");
     Model floor("../../resources/objects/floor.obj");
@@ -144,32 +144,32 @@ int main() {
     cornell_box_light.baseColor = vec3(1, 1, 1);
     cornell_box_light.emissive = vec3(15, 15, 15);
 
-//    getTriangle(quad.meshes, triangles, cornell_box_white,
-//                getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-//    getTriangle(quad.meshes, triangles, cornell_box_white,
-//                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-//    getTriangle(quad.meshes, triangles, cornell_box_white,
-//                getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -11), vec3(11.1, 11.1, 0.2)), false);
-//    getTriangle(quad.meshes, triangles, cornell_box_green,
-//                getTransformMatrix(vec3(0, 0, 0), vec3(-5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-//    getTriangle(quad.meshes, triangles, cornell_box_red,
-//                getTransformMatrix(vec3(0, 0, 0), vec3(5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-//    getTriangle(quad.meshes, triangles, cornell_box_light,
-//                getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.49, -5.5), vec3(2.6, 0.1, 2.1)), false);
-//    getTriangle(quad.meshes, triangles, cornell_box_white,
-//                getTransformMatrix(vec3(0, 15, 0), vec3(-1.65, -2.2, -7.5), vec3(3.2, 6.6, 3.2)), false);
-//    getTriangle(sphere.meshes, triangles, cornell_box_white,
-//                getTransformMatrix(vec3(0, 0, 0), vec3(1.65, -3.9, -5), vec3(3.2, 3.2, 3.2)), false);
+   getTriangle(quad.meshes, triangles, cornell_box_white,
+               getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
+   getTriangle(quad.meshes, triangles, cornell_box_white,
+               getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
+   getTriangle(quad.meshes, triangles, cornell_box_white,
+               getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -11), vec3(11.1, 11.1, 0.2)), false);
+   getTriangle(quad.meshes, triangles, cornell_box_green,
+               getTransformMatrix(vec3(0, 0, 0), vec3(-5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
+   getTriangle(quad.meshes, triangles, cornell_box_red,
+               getTransformMatrix(vec3(0, 0, 0), vec3(5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
+   getTriangle(quad.meshes, triangles, cornell_box_light,
+               getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.49, -5.5), vec3(2.6, 0.1, 2.1)), false);
+   getTriangle(quad.meshes, triangles, cornell_box_white,
+               getTransformMatrix(vec3(0, 15, 0), vec3(-1.65, -2.2, -7.5), vec3(3.2, 6.6, 3.2)), false);
+   getTriangle(sphere.meshes, triangles, cornell_box_white,
+               getTransformMatrix(vec3(0, 0, 0), vec3(1.65, -3.9, -5), vec3(3.2, 3.2, 3.2)), false);
 
    // bunny
-    getTriangle(bunny.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(2, 2, 2)), false);
-    getTriangle(plate.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(10, 10, 10)), false);
-    getTriangle(floor.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(200, 200, 200)), false);
-    getTriangle(floor.meshes, triangles, cornell_box_light,
-                getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -5), vec3(1.5, 1, 10)), false);
+   //  getTriangle(bunny.meshes, triangles, cornell_box_white,
+   //              getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(2, 2, 2)), false);
+   //  getTriangle(plate.meshes, triangles, cornell_box_white,
+   //              getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(10, 10, 10)), false);
+   //  getTriangle(floor.meshes, triangles, cornell_box_white,
+   //              getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(200, 200, 200)), false);
+   //  getTriangle(floor.meshes, triangles, cornell_box_light,
+   //              getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -5), vec3(1.5, 1, 10)), false);
 #pragma endregion
 
     int nTriangles = triangles.size();
@@ -290,7 +290,11 @@ int main() {
         static float f = 0.0f;
         static int counter = 0;
         ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 0, main_viewport->WorkPos.y + 0));
+#ifdef __APPLE__
+        ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 1.5, height / 2.0));
+#else
         ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 3.0, height));
+#endif
         ImGuiWindowFlags window_flags = 0;
         window_flags |= ImGuiWindowFlags_NoTitleBar;
         window_flags |= ImGuiWindowFlags_NoMove;
@@ -368,17 +372,25 @@ int main() {
             ScreenShader.setInt("screenTexture", 0);
             // screen.DrawScreen();
 
-
-            ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + width / 10.0 * 3.0, main_viewport->WorkPos.y + 0));
-            ImGui::SetNextWindowSize(ImVec2((float)width / 10.0 * 7.0, (float)height));
+            ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + width / 10.0 * 1.5, main_viewport->WorkPos.y + 0));
+#ifdef __APPLE__
+            ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 3.5, height / 2.0));
+#else
+            ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 7.0, height));
+#endif
             ImGuiWindowFlags scene_view_flags = 0;
             scene_view_flags |= ImGuiWindowFlags_NoTitleBar;
             scene_view_flags |= ImGuiWindowFlags_NoScrollbar;
             scene_view_flags |= ImGuiWindowFlags_NoMove;
             scene_view_flags |= ImGuiWindowFlags_NoResize;
             ImGui::Begin("Scene View", nullptr, scene_view_flags);
+#ifdef __APPLE__
+            ImGui::Image((void *) (intptr_t) screenBuffer.getCurrentTexture(camera.LoopNum),
+                         ImVec2(width / 2.0, height / 2.0), ImVec2(0, 1), ImVec2(1, 0));
+#else
             ImGui::Image((void *) (intptr_t) screenBuffer.getCurrentTexture(camera.LoopNum),
                          ImVec2(width, height), ImVec2(0, 1), ImVec2(1, 0));
+#endif
             ImGui::End();
         }
 
