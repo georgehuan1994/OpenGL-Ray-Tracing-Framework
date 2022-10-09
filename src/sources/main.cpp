@@ -34,12 +34,12 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 // settings
-const unsigned int SCR_WIDTH = 512;
-const unsigned int SCR_HEIGHT = 512;
+const unsigned int SCR_WIDTH = 1280;
+const unsigned int SCR_HEIGHT = 720;
 // const unsigned int SCENE_WIDTH = 512;
 // const unsigned int SCENE_HEIGHT = 512;
 
-#define RENDER_SCALE 0.5
+#define RENDER_SCALE 1
 
 // camera
 Camera camera((float) SCR_WIDTH / (float) SCR_HEIGHT, glm::vec3(0.0f, 0.0f, 7.0f));
@@ -76,7 +76,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "Tiny GL PathTracer", NULL, NULL);
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Ray Tracing Framework", NULL, NULL);
     if (window == NULL) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -113,9 +113,11 @@ int main() {
 
     // load models
     // -----------
-    Model sphere("../../resources/objects/sphere.obj");
-    Model quad("../../resources/objects/quad.obj");
-    Model bunny("../../resources/objects/bunny_4000.obj");
+//    Model sphere("../../resources/objects/sphere.obj");
+//    Model quad("../../resources/objects/quad.obj");
+    Model bunny("../../resources/objects/bunny.obj");
+    Model plate("../../resources/objects/plate.obj");
+    Model floor("../../resources/objects/floor.obj");
 
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
@@ -130,57 +132,44 @@ int main() {
     std::vector<Triangle> triangles;
 
 
-#pragma region scene
-    // cornell box
-    // -----------
+#pragma region cornell box
     Material cornell_box_white;
     Material cornell_box_red;
     Material cornell_box_green;
     Material cornell_box_light;
+
     cornell_box_white.baseColor = vec3(0.73, 0.73, 0.73);
     cornell_box_red.baseColor = vec3(0.65, 0.05, 0.05);
     cornell_box_green.baseColor = vec3(0.12, 0.45, 0.15);
     cornell_box_light.baseColor = vec3(1, 1, 1);
     cornell_box_light.emissive = vec3(15, 15, 15);
 
-//     // 上
-//     getTriangle(quad.meshes, triangles, cornell_box_white,
-//                 getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-//
-//     // 下
-//     getTriangle(quad.meshes, triangles, cornell_box_white,
-//                 getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-//
-//     // 后
-//     getTriangle(quad.meshes, triangles, cornell_box_white,
-//                 getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -11), vec3(11.1, 11.1, 0.2)), false);
-//
-//     // 左
-//     getTriangle(quad.meshes, triangles, cornell_box_green,
-//                 getTransformMatrix(vec3(0, 0, 0), vec3(-5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-//
-//     // 右
-//     getTriangle(quad.meshes, triangles, cornell_box_red,
-//                 getTransformMatrix(vec3(0, 0, 0), vec3(5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-//
-//     // 灯
-//     getTriangle(quad.meshes, triangles, cornell_box_light,
-//                 getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.49, -5.5), vec3(2.6, 0.1, 2.1)), false);
-//
-//     // cube
-//     getTriangle(quad.meshes, triangles, cornell_box_white,
-//                 getTransformMatrix(vec3(0, 15, 0), vec3(-1.65, -2.2, -7.5), vec3(3.2, 6.6, 3.2)), false);
-// //    getTriangle(quad.meshes, triangles, cornell_box_white,
-// //                getTransformMatrix(vec3(0, -18, 0), vec3(1.65, -3.9, -4.65), vec3(3.2, 3.2, 3.2)), false);
-
-    // sphere
-    getTriangle(sphere.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 0, 0), vec3(1.65, -3.9, -5), vec3(3.2, 3.2, 3.2)), false);
+//    getTriangle(quad.meshes, triangles, cornell_box_white,
+//                getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
+//    getTriangle(quad.meshes, triangles, cornell_box_white,
+//                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
+//    getTriangle(quad.meshes, triangles, cornell_box_white,
+//                getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -11), vec3(11.1, 11.1, 0.2)), false);
+//    getTriangle(quad.meshes, triangles, cornell_box_green,
+//                getTransformMatrix(vec3(0, 0, 0), vec3(-5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
+//    getTriangle(quad.meshes, triangles, cornell_box_red,
+//                getTransformMatrix(vec3(0, 0, 0), vec3(5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
+//    getTriangle(quad.meshes, triangles, cornell_box_light,
+//                getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.49, -5.5), vec3(2.6, 0.1, 2.1)), false);
+//    getTriangle(quad.meshes, triangles, cornell_box_white,
+//                getTransformMatrix(vec3(0, 15, 0), vec3(-1.65, -2.2, -7.5), vec3(3.2, 6.6, 3.2)), false);
+//    getTriangle(sphere.meshes, triangles, cornell_box_white,
+//                getTransformMatrix(vec3(0, 0, 0), vec3(1.65, -3.9, -5), vec3(3.2, 3.2, 3.2)), false);
 
    // bunny
-   // getTriangle(bunny.meshes, triangles, cornell_box_white,
-   //             getTransformMatrix(vec3(0, 0, 0), vec3(2.5, -6.4, -5), vec3(3.2, 3.2, 3.2)), false);
-
+    getTriangle(bunny.meshes, triangles, cornell_box_white,
+                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(2, 2, 2)), false);
+    getTriangle(plate.meshes, triangles, cornell_box_white,
+                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(10, 10, 10)), false);
+    getTriangle(floor.meshes, triangles, cornell_box_white,
+                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(200, 200, 200)), false);
+    getTriangle(floor.meshes, triangles, cornell_box_light,
+                getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -5), vec3(1.5, 1, 10)), false);
 #pragma endregion
 
     int nTriangles = triangles.size();
@@ -253,10 +242,10 @@ int main() {
 
     // HDR 全景图
     HDRLoaderResult hdrRes;
-    bool r = HDRLoader::load("../../resources/textures/hdr/circus_arena_4k.hdr", hdrRes);
+//    bool r = HDRLoader::load("../../resources/textures/hdr/circus_arena_4k.hdr", hdrRes);
+    bool r = HDRLoader::load("../../resources/textures/hdr/syferfontein_18d_clear_1k.hdr", hdrRes);
     hdrMap = getTextureRGB32F(hdrRes.width, hdrRes.height);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, hdrRes.cols);
-    // hdrMap = TextureFromFile("circus_arena_4k.hdr", "../../resources/textures/hdr", false, true);
 
     // 线框模式
     // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -268,17 +257,12 @@ int main() {
     (void) io;
 
     // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
-    //ImGui::StyleColorsLight();
+    ImGui::StyleColorsClassic();
 
     // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
-    // Our state
-    bool show_demo_window = true;
-    bool show_another_window = false;
-    ImVec4 clear_color = ImVec4(0.45f, 0.55f, 0.60f, 1.00f);
 
     // 渲染循环
     // -------
@@ -301,48 +285,41 @@ int main() {
         ImGui::NewFrame();
 
         ShowAppMainMenuBar();
-
-
-
-       // 1. Show the big demo window (Most of the sample code is in ImGui::ShowDemoWindow()! You can browse its code to learn more about Dear ImGui!).
-       if (show_demo_window)
-           ImGui::ShowDemoWindow(&show_demo_window);
-
-       // 2. Show a simple window that we create ourselves. We use a Begin/End pair to create a named window.
-       {
-           static float f = 0.0f;
-           static int counter = 0;
-
-           ImGui::Begin("Hello, world!");                          // Create a window called "Hello, world!" and append into it.
-
-           ImGui::Text("pointer = %p", 1);
-           ImGui::Text("size = %d x %d", width / 4, height / 4);
-
-           ImGui::Text("This is some useful text.");               // Display some text (you can use a format strings too)
-           ImGui::Checkbox("Demo Window", &show_demo_window);      // Edit bools storing our window open/close state
-           ImGui::Checkbox("Another Window", &show_another_window);
-
-           ImGui::SliderFloat("float", &f, 0.0f, 1.0f);            // Edit 1 float using a slider from 0.0f to 1.0f
-           ImGui::ColorEdit3("clear color", (float*)&clear_color); // Edit 3 floats representing a color
-
-           if (ImGui::Button("Button"))                            // Buttons return true when clicked (most widgets return true when edited/activated)
-               counter++;
-           ImGui::SameLine();
-           ImGui::Text("counter = %d", counter);
-
-           ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-           ImGui::End();
-       }
-
-       // 3. Show another simple window.
-       if (show_another_window)
-       {
-           ImGui::Begin("Another Window", &show_another_window);   // Pass a pointer to our bool variable (the window will have a closing button that will clear the bool when clicked)
-           ImGui::Text("Hello from another window!");
-           if (ImGui::Button("Close Me"))
-               show_another_window = false;
-           ImGui::End();
-       }
+        glfwGetFramebufferSize(window, &width, &height);
+        const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+        static float f = 0.0f;
+        static int counter = 0;
+        ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 0, main_viewport->WorkPos.y + 0));
+        ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 3.0, height));
+        ImGuiWindowFlags window_flags = 0;
+        window_flags |= ImGuiWindowFlags_NoTitleBar;
+        window_flags |= ImGuiWindowFlags_NoMove;
+        window_flags |= ImGuiWindowFlags_NoResize;
+        ImGui::Begin("Inspector", nullptr, window_flags);
+        ImGui::Text("RMB: look around");
+        ImGui::Text("MMB: zoom the view");
+        ImGui::Text("WASD: move camera");
+        ImGui::Separator();
+        ImGui::Text("Screen Buffer Size: (%d x %d)", width, height);
+        ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        ImGui::Text("Iterations: %d", camera.LoopNum);
+        ImGui::Separator();
+        ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camera.Position.x, camera.Position.y, camera.Position.z);
+        ImGui::Text("Camera Front: (%.2f, %.2f, %.2f)", camera.Front.x, camera.Front.y, camera.Front.z);
+        ImGui::Text("Camera Up: (%.2f, %.2f, %.2f)", camera.Up.x, camera.Up.y, camera.Up.z);
+        ImGui::Text("Camera Zoom: %.2f", camera.Zoom);
+        ImGui::Separator();
+        ImGui::Checkbox("Demo Window", &show_demo_window);
+        if (show_demo_window)
+            ImGui::ShowDemoWindow(&show_demo_window);
+//        ImGui::Checkbox("Another Window", &show_another_window);
+//        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
+//        ImGui::ColorEdit3("clear color", (float*)&clear_color);
+//        if (ImGui::Button("Button"))
+//            counter++;
+//        ImGui::SameLine();
+//        ImGui::Text("counter = %d", counter);
+        ImGui::End();
 
         // render
         // ------
@@ -391,15 +368,19 @@ int main() {
             ScreenShader.setInt("screenTexture", 0);
             // screen.DrawScreen();
 
-            glfwGetFramebufferSize(window, &width, &height);
-            ImGui::SetNextWindowSize(ImVec2(width / 4, height / 4));
-            ImGui::Begin("Scene View");
-            ImGui::SetNextItemWidth(width / 4);
+
+            ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + width / 10.0 * 3.0, main_viewport->WorkPos.y + 0));
+            ImGui::SetNextWindowSize(ImVec2((float)width / 10.0 * 7.0, (float)height));
+            ImGuiWindowFlags scene_view_flags = 0;
+            scene_view_flags |= ImGuiWindowFlags_NoTitleBar;
+            scene_view_flags |= ImGuiWindowFlags_NoScrollbar;
+            scene_view_flags |= ImGuiWindowFlags_NoMove;
+            scene_view_flags |= ImGuiWindowFlags_NoResize;
+            ImGui::Begin("Scene View", nullptr, scene_view_flags);
             ImGui::Image((void *) (intptr_t) screenBuffer.getCurrentTexture(camera.LoopNum),
-                         ImVec2(width / 4, height / 4), ImVec2(0, 1), ImVec2(1, 0));
+                         ImVec2(width, height), ImVec2(0, 1), ImVec2(1, 0));
             ImGui::End();
         }
-
 
         // // view/projection transformations
         // glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) WINDOW_WIDTH / (float) WINDOW_HEIGHT, 0.1f,
