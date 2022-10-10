@@ -20,7 +20,6 @@ uniform samplerBuffer nodes;
 uniform int nNodes;
 
 uniform float randOrigin;
-uniform Camera camera;
 
 // 三角面参数
 // --------
@@ -71,6 +70,7 @@ struct Camera {
     vec3 leftBottomCorner;
     int loopNum;
 };
+uniform Camera camera;
 
 // 射线参数
 // -------
@@ -94,6 +94,10 @@ struct HitRecord {
 uint wseed;
 float rand(void);
 
+float sqr(float x) {
+    return x*x;
+}
+
 // 随机种
 // -----
 float randcore(uint seed) {
@@ -110,20 +114,23 @@ float randcore(uint seed) {
 float rand() { return randcore(wseed); }
 
 // 1 ~ 8 维的 sobol 生成矩阵
-const uint V[8*32] = {
-2147483648u,1073741824u,536870912u,268435456u,134217728u,67108864u,33554432u,16777216u,8388608u,4194304u,2097152u,1048576u,524288u,262144u,131072u,65536u,32768u,16384u,8192u,4096u,2048u,1024u,512u,256u,128u,64u,32u,16u,8u,4u,2u,1u,2147483648u,3221225472u,2684354560u,4026531840u,2281701376u,3422552064u,2852126720u,4278190080u,2155872256u,3233808384u,2694840320u,4042260480u,2290614272u,3435921408u,2863267840u,4294901760u,2147516416u,3221274624u,2684395520u,4026593280u,2281736192u,3422604288u,2852170240u,4278255360u,2155905152u,3233857728u,2694881440u,4042322160u,2290649224u,3435973836u,2863311530u,4294967295u,2147483648u,3221225472u,1610612736u,2415919104u,3892314112u,1543503872u,2382364672u,3305111552u,1753219072u,2629828608u,3999268864u,1435500544u,2154299392u,3231449088u,1626210304u,2421489664u,3900735488u,1556135936u,2388680704u,3314585600u,1751705600u,2627492864u,4008611328u,1431684352u,2147543168u,3221249216u,1610649184u,2415969680u,3892340840u,1543543964u,2382425838u,3305133397u,2147483648u,3221225472u,536870912u,1342177280u,4160749568u,1946157056u,2717908992u,2466250752u,3632267264u,624951296u,1507852288u,3872391168u,2013790208u,3020685312u,2181169152u,3271884800u,546275328u,1363623936u,4226424832u,1977167872u,2693105664u,2437829632u,3689389568u,635137280u,1484783744u,3846176960u,2044723232u,3067084880u,2148008184u,3222012020u,537002146u,1342505107u,2147483648u,1073741824u,536870912u,2952790016u,4160749568u,3690987520u,2046820352u,2634022912u,1518338048u,801112064u,2707423232u,4038066176u,3666345984u,1875116032u,2170683392u,1085997056u,579305472u,3016343552u,4217741312u,3719483392u,2013407232u,2617981952u,1510979072u,755882752u,2726789248u,4090085440u,3680870432u,1840435376u,2147625208u,1074478300u,537900666u,2953698205u,2147483648u,1073741824u,1610612736u,805306368u,2818572288u,335544320u,2113929216u,3472883712u,2290089984u,3829399552u,3059744768u,1127219200u,3089629184u,4199809024u,3567124480u,1891565568u,394297344u,3988799488u,920674304u,4193267712u,2950604800u,3977188352u,3250028032u,129093376u,2231568512u,2963678272u,4281226848u,432124720u,803643432u,1633613396u,2672665246u,3170194367u,2147483648u,3221225472u,2684354560u,3489660928u,1476395008u,2483027968u,1040187392u,3808428032u,3196059648u,599785472u,505413632u,4077912064u,1182269440u,1736704000u,2017853440u,2221342720u,3329785856u,2810494976u,3628507136u,1416089600u,2658719744u,864310272u,3863387648u,3076993792u,553150080u,272922560u,4167467040u,1148698640u,1719673080u,2009075780u,2149644390u,3222291575u,2147483648u,1073741824u,2684354560u,1342177280u,2281701376u,1946157056u,436207616u,2566914048u,2625634304u,3208642560u,2720006144u,2098200576u,111673344u,2354315264u,3464626176u,4027383808u,2886631424u,3770826752u,1691164672u,3357462528u,1993345024u,3752330240u,873073152u,2870150400u,1700563072u,87021376u,1097028000u,1222351248u,1560027592u,2977959924u,23268898u,437609937u
-};
+const int V[8*32] = int[8*32](
+2147483648, 1073741824, 536870912, 268435456, 134217728, 67108864, 33554432, 16777216, 8388608, 4194304, 2097152, 1048576, 524288, 262144, 131072, 65536, 32768, 16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 2147483648, 3221225472, 2684354560, 4026531840, 2281701376, 3422552064, 2852126720, 4278190080, 2155872256, 3233808384, 2694840320, 4042260480, 2290614272, 3435921408, 2863267840, 4294901760, 2147516416, 3221274624, 2684395520, 4026593280, 2281736192, 3422604288, 2852170240, 4278255360, 2155905152, 3233857728, 2694881440, 4042322160, 2290649224, 3435973836, 2863311530, 4294967295, 2147483648, 3221225472, 1610612736, 2415919104, 3892314112, 1543503872, 2382364672, 3305111552, 1753219072, 2629828608, 3999268864, 1435500544, 2154299392, 3231449088, 1626210304, 2421489664, 3900735488, 1556135936, 2388680704, 3314585600, 1751705600, 2627492864, 4008611328, 1431684352, 2147543168, 3221249216, 1610649184, 2415969680, 3892340840, 1543543964, 2382425838, 3305133397, 2147483648, 3221225472, 536870912, 1342177280, 4160749568, 1946157056, 2717908992, 2466250752, 3632267264, 624951296, 1507852288, 3872391168, 2013790208, 3020685312, 2181169152, 3271884800, 546275328, 1363623936, 4226424832, 1977167872, 2693105664, 2437829632, 3689389568, 635137280, 1484783744, 3846176960, 2044723232, 3067084880, 2148008184, 3222012020, 537002146, 1342505107, 2147483648, 1073741824, 536870912, 2952790016, 4160749568, 3690987520, 2046820352, 2634022912, 1518338048, 801112064, 2707423232, 4038066176, 3666345984, 1875116032, 2170683392, 1085997056, 579305472, 3016343552, 4217741312, 3719483392, 2013407232, 2617981952, 1510979072, 755882752, 2726789248, 4090085440, 3680870432, 1840435376, 2147625208, 1074478300, 537900666, 2953698205, 2147483648, 1073741824, 1610612736, 805306368, 2818572288, 335544320, 2113929216, 3472883712, 2290089984, 3829399552, 3059744768, 1127219200, 3089629184, 4199809024, 3567124480, 1891565568, 394297344, 3988799488, 920674304, 4193267712, 2950604800, 3977188352, 3250028032, 129093376, 2231568512, 2963678272, 4281226848, 432124720, 803643432, 1633613396, 2672665246, 3170194367, 2147483648, 3221225472, 2684354560, 3489660928, 1476395008, 2483027968, 1040187392, 3808428032, 3196059648, 599785472, 505413632, 4077912064, 1182269440, 1736704000, 2017853440, 2221342720, 3329785856, 2810494976, 3628507136, 1416089600, 2658719744, 864310272, 3863387648, 3076993792, 553150080, 272922560, 4167467040, 1148698640, 1719673080, 2009075780, 2149644390, 3222291575, 2147483648, 1073741824, 2684354560, 1342177280, 2281701376, 1946157056, 436207616, 2566914048, 2625634304, 3208642560, 2720006144, 2098200576, 111673344, 2354315264, 3464626176, 4027383808, 2886631424, 3770826752, 1691164672, 3357462528, 1993345024, 3752330240, 873073152, 2870150400, 1700563072, 87021376, 1097028000, 1222351248, 1560027592, 2977959924, 23268898, 437609937
+);
+//const uint V[8*32] = uint[8*32](
+//2147483648u,1073741824u,536870912u,268435456u,134217728u,67108864u,33554432u,16777216u,8388608u,4194304u,2097152u,1048576u,524288u,262144u,131072u,65536u,32768u,16384u,8192u,4096u,2048u,1024u,512u,256u,128u,64u,32u,16u,8u,4u,2u,1u,2147483648u,3221225472u,2684354560u,4026531840u,2281701376u,3422552064u,2852126720u,4278190080u,2155872256u,3233808384u,2694840320u,4042260480u,2290614272u,3435921408u,2863267840u,4294901760u,2147516416u,3221274624u,2684395520u,4026593280u,2281736192u,3422604288u,2852170240u,4278255360u,2155905152u,3233857728u,2694881440u,4042322160u,2290649224u,3435973836u,2863311530u,4294967295u,2147483648u,3221225472u,1610612736u,2415919104u,3892314112u,1543503872u,2382364672u,3305111552u,1753219072u,2629828608u,3999268864u,1435500544u,2154299392u,3231449088u,1626210304u,2421489664u,3900735488u,1556135936u,2388680704u,3314585600u,1751705600u,2627492864u,4008611328u,1431684352u,2147543168u,3221249216u,1610649184u,2415969680u,3892340840u,1543543964u,2382425838u,3305133397u,2147483648u,3221225472u,536870912u,1342177280u,4160749568u,1946157056u,2717908992u,2466250752u,3632267264u,624951296u,1507852288u,3872391168u,2013790208u,3020685312u,2181169152u,3271884800u,546275328u,1363623936u,4226424832u,1977167872u,2693105664u,2437829632u,3689389568u,635137280u,1484783744u,3846176960u,2044723232u,3067084880u,2148008184u,3222012020u,537002146u,1342505107u,2147483648u,1073741824u,536870912u,2952790016u,4160749568u,3690987520u,2046820352u,2634022912u,1518338048u,801112064u,2707423232u,4038066176u,3666345984u,1875116032u,2170683392u,1085997056u,579305472u,3016343552u,4217741312u,3719483392u,2013407232u,2617981952u,1510979072u,755882752u,2726789248u,4090085440u,3680870432u,1840435376u,2147625208u,1074478300u,537900666u,2953698205u,2147483648u,1073741824u,1610612736u,805306368u,2818572288u,335544320u,2113929216u,3472883712u,2290089984u,3829399552u,3059744768u,1127219200u,3089629184u,4199809024u,3567124480u,1891565568u,394297344u,3988799488u,920674304u,4193267712u,2950604800u,3977188352u,3250028032u,129093376u,2231568512u,2963678272u,4281226848u,432124720u,803643432u,1633613396u,2672665246u,3170194367u,2147483648u,3221225472u,2684354560u,3489660928u,1476395008u,2483027968u,1040187392u,3808428032u,3196059648u,599785472u,505413632u,4077912064u,1182269440u,1736704000u,2017853440u,2221342720u,3329785856u,2810494976u,3628507136u,1416089600u,2658719744u,864310272u,3863387648u,3076993792u,553150080u,272922560u,4167467040u,1148698640u,1719673080u,2009075780u,2149644390u,3222291575u,2147483648u,1073741824u,2684354560u,1342177280u,2281701376u,1946157056u,436207616u,2566914048u,2625634304u,3208642560u,2720006144u,2098200576u,111673344u,2354315264u,3464626176u,4027383808u,2886631424u,3770826752u,1691164672u,3357462528u,1993345024u,3752330240u,873073152u,2870150400u,1700563072u,87021376u,1097028000u,1222351248u,1560027592u,2977959924u,23268898u,437609937u
+//);
 
 // 格林码
-uint grayCode(uint i) {
+int grayCode(int i) {
     return i ^ (i>>1);
 }
 
 // 生成第 d 维度的第 i 个 sobol 数
-float sobol(uint d, int i) {
-    uint result = 0;
-    uint offset = d * 32;
-    for(uint j = 0; i != 0; i >>= 1, j++)
+float sobol(int d, int i) {
+    int result = 0;
+    int offset = d * 32;
+    for(int j = 0; i != 0; i >>= 1, j++)
     if((i & 1) != 0)
     result ^= V[j+offset];
 
@@ -131,7 +138,7 @@ float sobol(uint d, int i) {
 }
 
 // 生成第 i 帧的第 b 次反弹需要的二维随机向量
-vec2 sobolVec2(uint i, uint b) {
+vec2 sobolVec2(int i, int b) {
     float u = sobol(b*2, grayCode(i));
     float v = sobol(b*2+1, grayCode(i));
     return vec2(u, v);
@@ -255,6 +262,97 @@ vec3 toNormalHemisphere(vec3 v, vec3 N) {
     vec3 bitangent = normalize(cross(N, tangent));
     return v.x * tangent + v.y * bitangent + v.z * N;
 }
+
+// 余弦加权的法向半球采样
+// ------------------
+vec3 SampleCosineHemisphere(float xi_1, float xi_2, vec3 N) {
+    // 均匀采样 xy 圆盘然后投影到 z 半球
+    float r = sqrt(xi_1);
+    float theta = xi_2 * 2.0 * PI;
+    float x = r * cos(theta);
+    float y = r * sin(theta);
+    float z = sqrt(1.0 - x*x - y*y);
+
+    // 从 z 半球投影到法向半球
+    vec3 L = toNormalHemisphere(vec3(x, y, z), N);
+    return L;
+}
+
+
+// GTR2 重要性采样
+vec3 SampleGTR2(float xi_1, float xi_2, vec3 V, vec3 N, float alpha) {
+
+    float phi_h = 2.0 * PI * xi_1;
+    float sin_phi_h = sin(phi_h);
+    float cos_phi_h = cos(phi_h);
+
+    float cos_theta_h = sqrt((1.0-xi_2)/(1.0+(alpha*alpha-1.0)*xi_2));
+    float sin_theta_h = sqrt(max(0.0, 1.0 - cos_theta_h * cos_theta_h));
+
+    // 采样 "微平面" 的法向量 作为镜面反射的半角向量 h
+    vec3 H = vec3(sin_theta_h*cos_phi_h, sin_theta_h*sin_phi_h, cos_theta_h);
+    H = toNormalHemisphere(H, N);   // 投影到真正的法向半球
+
+    // 根据 "微法线" 计算反射光方向
+    vec3 L = reflect(-V, H);
+
+    return L;
+}
+
+// GTR1 重要性采样
+vec3 SampleGTR1(float xi_1, float xi_2, vec3 V, vec3 N, float alpha) {
+
+    float phi_h = 2.0 * PI * xi_1;
+    float sin_phi_h = sin(phi_h);
+    float cos_phi_h = cos(phi_h);
+
+    float cos_theta_h = sqrt((1.0-pow(alpha*alpha, 1.0-xi_2))/(1.0-alpha*alpha));
+    float sin_theta_h = sqrt(max(0.0, 1.0 - cos_theta_h * cos_theta_h));
+
+    // 采样 "微平面" 的法向量 作为镜面反射的半角向量 h
+    vec3 H = vec3(sin_theta_h*cos_phi_h, sin_theta_h*sin_phi_h, cos_theta_h);
+    H = toNormalHemisphere(H, N);   // 投影到真正的法向半球
+
+    // 根据 "微法线" 计算反射光方向
+    vec3 L = reflect(-V, H);
+
+    return L;
+}
+
+// 按照辐射度分布分别采样三种 BRDF
+vec3 SampleBRDF(float xi_1, float xi_2, float xi_3, vec3 V, vec3 N, in Material material) {
+    float alpha_GTR1 = mix(0.1, 0.001, material.clearcoatGloss);
+    float alpha_GTR2 = max(0.001, sqr(material.roughness));
+
+    // 辐射度统计
+    float r_diffuse = (1.0 - material.metallic);
+    float r_specular = 1.0;
+    float r_clearcoat = 0.25 * material.clearcoat;
+    float r_sum = r_diffuse + r_specular + r_clearcoat;
+
+    // 根据辐射度计算概率
+    float p_diffuse = r_diffuse / r_sum;
+    float p_specular = r_specular / r_sum;
+    float p_clearcoat = r_clearcoat / r_sum;
+
+    // 按照概率采样
+    float rd = xi_3;
+
+    // 漫反射
+    if(rd <= p_diffuse) {
+        return SampleCosineHemisphere(xi_1, xi_2, N);
+    }
+    // 镜面反射
+    else if(p_diffuse < rd && rd <= p_diffuse + p_specular) {
+        return SampleGTR2(xi_1, xi_2, V, N, alpha_GTR2);
+    }
+    // 清漆
+    else if(p_diffuse + p_specular < rd) {
+        return SampleGTR1(xi_1, xi_2, V, N, alpha_GTR1);
+    }
+    return vec3(0, 1, 0);
+}
+
 
 
 void getTangent(vec3 N, inout vec3 tangent, inout vec3 bitangent) {
@@ -418,8 +516,24 @@ HitRecord hitBVH(Ray ray) {
     return rec;
 }
 
-float sqr(float x) {
-    return x*x;
+vec2 CranleyPattersonRotation(vec2 p) {
+    uint pseed = uint(
+    uint((TexCoords.x * 0.5 + 0.5) * screenWidth)  * uint(1973) +
+    uint((TexCoords.y * 0.5 + 0.5) * screenHeight) * uint(9277) +
+    uint(114514/1919) * uint(26699)) | uint(1);
+
+    float u = randcore(pseed);
+    float v = randcore(pseed);
+
+    p.x += u;
+    if(p.x>1) p.x -= 1;
+    if(p.x<0) p.x += 1;
+
+    p.y += v;
+    if(p.y>1) p.y -= 1;
+    if(p.y<0) p.y += 1;
+
+    return p;
 }
 
 float SchlickFresnel(float u) {
@@ -519,6 +633,102 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material)
     return diffuse * (1.0 - material.metallic) + specular + clearcoat;
 }
 
+vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material) {
+    float NdotL = dot(N, L);
+    float NdotV = dot(N, V);
+    if(NdotL < 0 || NdotV < 0) return vec3(0);
+
+    vec3 H = normalize(L + V);
+    float NdotH = dot(N, H);
+    float LdotH = dot(L, H);
+
+    // 各种颜色
+    vec3 Cdlin = material.baseColor;
+    float Cdlum = 0.3 * Cdlin.r + 0.6 * Cdlin.g  + 0.1 * Cdlin.b;
+    vec3 Ctint = (Cdlum > 0) ? (Cdlin/Cdlum) : (vec3(1));
+    vec3 Cspec = material.specular * mix(vec3(1), Ctint, material.specularTint);
+    vec3 Cspec0 = mix(0.08*Cspec, Cdlin, material.metallic); // 0° 镜面反射颜色
+    vec3 Csheen = mix(vec3(1), Ctint, material.sheenTint);   // 织物颜色
+
+    // 漫反射
+    float Fd90 = 0.5 + 2.0 * LdotH * LdotH * material.roughness;
+    float FL = SchlickFresnel(NdotL);
+    float FV = SchlickFresnel(NdotV);
+    float Fd = mix(1.0, Fd90, FL) * mix(1.0, Fd90, FV);
+
+    // 次表面散射
+    float Fss90 = LdotH * LdotH * material.roughness;
+    float Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV);
+    float ss = 1.25 * (Fss * (1.0 / (NdotL + NdotV) - 0.5) + 0.5);
+
+    // 镜面反射 -- 各向同性
+    float alpha = max(0.001, sqr(material.roughness));
+    float Ds = GTR2(NdotH, alpha);
+    float FH = SchlickFresnel(LdotH);
+    vec3 Fs = mix(Cspec0, vec3(1), FH);
+    float Gs = smithG_GGX(NdotL, material.roughness);
+    Gs *= smithG_GGX(NdotV, material.roughness);
+
+    // 清漆
+    float Dr = GTR1(NdotH, mix(0.1, 0.001, material.clearcoatGloss));
+    float Fr = mix(0.04, 1.0, FH);
+    float Gr = smithG_GGX(NdotL, 0.25) * smithG_GGX(NdotV, 0.25);
+
+    // sheen
+    vec3 Fsheen = FH * material.sheen * Csheen;
+
+    vec3 diffuse = (1.0/PI) * mix(Fd, ss, material.subsurface) * Cdlin + Fsheen;
+    vec3 specular = Gs * Fs * Ds;
+    vec3 clearcoat = vec3(0.25 * Gr * Fr * Dr * material.clearcoat);
+
+    return diffuse * (1.0 - material.metallic) + specular + clearcoat;
+}
+
+// 获取 BRDF 在 L 方向上的概率密度
+float BRDF_Pdf(vec3 V, vec3 N, vec3 L, in Material material) {
+    float NdotL = dot(N, L);
+    float NdotV = dot(N, V);
+    if(NdotL < 0 || NdotV < 0) return 0;
+
+    vec3 H = normalize(L + V);
+    float NdotH = dot(N, H);
+    float LdotH = dot(L, H);
+
+    // 镜面反射 -- 各向同性
+    float alpha = max(0.001, sqr(material.roughness));
+    float Ds = GTR2(NdotH, alpha);
+    float Dr = GTR1(NdotH, mix(0.1, 0.001, material.clearcoatGloss));   // 清漆
+
+    // 分别计算三种 BRDF 的概率密度
+    float pdf_diffuse = NdotL / PI;
+    float pdf_specular = Ds * NdotH / (4.0 * dot(L, H));
+    float pdf_clearcoat = Dr * NdotH / (4.0 * dot(L, H));
+
+    // 辐射度统计
+    float r_diffuse = (1.0 - material.metallic);
+    float r_specular = 1.0;
+    float r_clearcoat = 0.25 * material.clearcoat;
+    float r_sum = r_diffuse + r_specular + r_clearcoat;
+
+    // 根据辐射度计算选择某种采样方式的概率
+    float p_diffuse = r_diffuse / r_sum;
+    float p_specular = r_specular / r_sum;
+    float p_clearcoat = r_clearcoat / r_sum;
+
+    // 根据概率混合 pdf
+    float pdf = p_diffuse   * pdf_diffuse
+    + p_specular  * pdf_specular
+    + p_clearcoat * pdf_clearcoat;
+
+    pdf = max(1e-10, pdf);
+    return pdf;
+}
+
+float misMixWeight(float a, float b) {
+    float t = a * a;
+    return t / (b*b + t);
+}
+
 // 路径追踪着色
 // ----------
 vec3 shading(HitRecord hit) {
@@ -531,18 +741,32 @@ vec3 shading(HitRecord hit) {
         vec3 V = -hit.viewDir;
         vec3 N = hit.normal;
 
-        vec2 uv = sobolVec2(frameCounter+1, bounce);
+        // 获取 3 个随机数
+        vec2 uv = sobolVec2(camera.loopNum + 1, i);
         uv = CranleyPattersonRotation(uv);
+        float xi_1 = uv.x;
+        float xi_2 = uv.y;
+        float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
 
-        vec3 L = SampleHemisphere(uv.x, uv.y);
-        L = toNormalHemisphere(L, hit.normal);                          // 出射方向 wi
-        float pdf = 1.0 / (2.0 * PI);                                   // 半球均匀采样概率密度
-        float cosine_o = max(0, dot(V, N));         // 入射光和法线夹角余弦
-        float cosine_i = max(0, dot(L, hit.normal));  // 出射光和法线夹角余弦
-        vec3 tangent, bitangent;
-        getTangent(N, tangent, bitangent);
-        vec3 f_r = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material);
-        // vec3 f_r = hit.material.baseColor / PI;                         // 漫反射 BRDF
+        // 采样 BRDF 得到一个方向 L
+        vec3 L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
+        float NdotL = dot(N, L);
+        if(NdotL <= 0.0) break;
+
+        // 获取 L 方向上的 BRDF 值和概率密度
+        vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
+        float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+        if(pdf_brdf <= 0.0) break;
+
+//        vec3 L = SampleHemisphere(uv.x, uv.y);
+//        L = toNormalHemisphere(L, hit.normal);                          // 出射方向 wi
+//        float pdf = 1.0 / (2.0 * PI);                                   // 半球均匀采样概率密度
+//        float cosine_o = max(0, dot(V, N));         // 入射光和法线夹角余弦
+//        float cosine_i = max(0, dot(L, hit.normal));  // 出射光和法线夹角余弦
+//        vec3 tangent, bitangent;
+//        getTangent(N, tangent, bitangent);
+//        vec3 f_r = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material);
+//        // vec3 f_r = hit.material.baseColor / PI;                         // 漫反射 BRDF
 
         // 漫反射: 随机发射光线
         Ray randomRay;
@@ -553,19 +777,22 @@ vec3 shading(HitRecord hit) {
 
         // 未命中
         if(!newHit.isHit) {
-            vec3 skyColor = vec3(0);
-//            vec3 skyColor = sampleHdr(randomRay.direction);
-            Lo += history * skyColor * f_r * cosine_i / pdf;
+//            vec3 skyColor = vec3(0);
+            vec3 skyColor = sampleHdr(randomRay.direction);
+            Lo += history * skyColor * f_r * NdotL / pdf_brdf;
+//            Lo += history * skyColor * f_r * cosine_i / pdf;
             break;
         }
 
         // 命中光源积累颜色
         vec3 Le = newHit.material.emissive;
-        Lo += history * Le * f_r * cosine_i / pdf;
+        Lo += history * Le * f_r * NdotL / pdf_brdf;
+//        Lo += history * Le * f_r * cosine_i / pdf;
 
         // 递归(步进)
         hit = newHit;
-        history *= f_r * cosine_i / pdf;  // 累积颜色
+        history *= f_r * NdotL / pdf_brdf;  // 累积颜色
+//        history *= f_r * cosine_i / pdf;  // 累积颜色
     }
     return Lo;
 }
@@ -608,10 +835,10 @@ void main() {
     vec3 curColor = vec3(0);
 
     if(!firstHit.isHit) {
-        curColor = vec3(0);
+//        curColor = vec3(0);
 //        float t = 0.5 * (cameraRay.direction.y + 1.0);
 //        curColor = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-//        curColor = sampleHdr(cameraRay.direction);
+        curColor = sampleHdr(cameraRay.direction);
     } else {
         vec3 Le = firstHit.material.emissive;
         vec3 Li = shading(firstHit);

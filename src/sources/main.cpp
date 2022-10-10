@@ -65,7 +65,7 @@ GLuint hdrMap;
 int main() {
 
     glfwInit();
-    const char *glsl_version = "#version 150";
+    const char *glsl_version = "#version 330 core";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -106,9 +106,9 @@ int main() {
     // -----------
     Model sphere("../../resources/objects/sphere.obj");
     Model quad("../../resources/objects/quad.obj");
-    Model bunny("../../resources/objects/bunny.obj");
-    Model plate("../../resources/objects/plate.obj");
-    Model floor("../../resources/objects/floor.obj");
+    Model bunny("../../resources/objects/bunny_4000.obj");
+    // Model plate("../../resources/objects/plate.obj");
+    // Model floor("../../resources/objects/floor.obj");
 
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
@@ -170,15 +170,15 @@ int main() {
     golden.clearcoat = 1.0;
 
     // bunny
-    getTriangle(bunny.meshes, triangles, jade,
+    getTriangle(sphere.meshes, triangles, golden,
                 getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.2, -5), vec3(2, 2, 2)), false);
 
-    getTriangle(plate.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(20, 10, 5)), false);
-    getTriangle(floor.meshes, triangles, cornell_box_white,
-                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(200, 200, 200)), false);
-    getTriangle(floor.meshes, triangles, cornell_box_light,
-                getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -5), vec3(1.5, 1, 10)), false);
+    // getTriangle(plate.meshes, triangles, cornell_box_white,
+    //             getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(20, 10, 5)), false);
+    // getTriangle(floor.meshes, triangles, cornell_box_white,
+    //             getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(200, 200, 200)), false);
+    // getTriangle(floor.meshes, triangles, cornell_box_light,
+    //             getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -5), vec3(1.5, 1, 10)), false);
 #pragma endregion
 
     int nTriangles = triangles.size();
@@ -251,8 +251,8 @@ int main() {
 
     // HDR 全景图
     HDRLoaderResult hdrRes;
-//    bool r = HDRLoader::load("../../resources/textures/hdr/circus_arena_4k.hdr", hdrRes);
-    bool r = HDRLoader::load("../../resources/textures/hdr/syferfontein_18d_clear_1k.hdr", hdrRes);
+   bool r = HDRLoader::load("../../resources/textures/hdr/newport_loft.hdr", hdrRes);
+//     bool r = HDRLoader::load("../../resources/textures/hdr/syferfontein_18d_clear_1k.hdr", hdrRes);
     hdrMap = getTextureRGB32F(hdrRes.width, hdrRes.height);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, hdrRes.cols);
 
@@ -273,6 +273,7 @@ int main() {
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     camera.Refresh();
+
 
     // 渲染循环
     // -------
@@ -333,9 +334,9 @@ int main() {
             glBindTexture(GL_TEXTURE_BUFFER, nodesTextureBuffer);
             RayTracerShader.setInt("nodes", 2);
 
-            // glActiveTexture(GL_TEXTURE0 + 3);
-            // glBindTexture(GL_TEXTURE_2D, hdrMap);
-            // RayTracerShader.setInt("hdrMap", 3);
+            glActiveTexture(GL_TEXTURE0 + 3);
+            glBindTexture(GL_TEXTURE_2D, hdrMap);
+            RayTracerShader.setInt("hdrMap", 3);
 
             RayTracerShader.use();
             RayTracerShader.setVec3("camera.position", camera.Position);
@@ -347,6 +348,8 @@ int main() {
             RayTracerShader.setVec3("camera.leftBottomCorner", camera.LeftBottomCorner);
             RayTracerShader.setInt("camera.loopNum", camera.LoopNum);
             RayTracerShader.setFloat("randOrigin", 674764.0f * (GetCPURandom() + 1.0f));
+            RayTracerShader.setInt("screenWidth", width);
+            RayTracerShader.setInt("screenHeight", height);
             screen.DrawScreen();
         }
 
