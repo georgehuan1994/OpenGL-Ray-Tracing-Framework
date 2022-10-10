@@ -60,8 +60,9 @@ public:
         Pitch = pitch;
         ScreenRatio = screenRatio;
         Fov = FOV;
-        halfH = glm::tan(glm::radians(ZOOM));
-        halfW = halfH * screenRatio;
+        halfH = glm::tan(glm::radians(Zoom));
+        halfW = halfH * ScreenRatio;
+        LeftBottomCorner = Front - halfW * Right - halfH * Up;
         LoopNum = 0;
         updateCameraVectors();
     }
@@ -123,6 +124,15 @@ public:
         LoopNum++;
     }
 
+    void Refresh() {
+        Right = glm::normalize(glm::cross(Front, WorldUp));
+        Up = glm::normalize(glm::cross(Right, Front));
+        halfH = glm::tan(glm::radians(Zoom));
+        halfW = halfH * ScreenRatio;
+        LeftBottomCorner = Front - halfW * Right - halfH * Up;
+        LoopNum = 0;
+    }
+
 private:
     void updateCameraVectors() {
         glm::vec3 front;
@@ -134,7 +144,7 @@ private:
         Up = glm::normalize(glm::cross(Right, Front));
         halfH = glm::tan(glm::radians(Zoom));
         halfW = halfH * ScreenRatio;
-        LeftBottomCorner = Front - halfH * Right - halfH * Up;
+        LeftBottomCorner = Front - halfW * Right - halfH * Up;
         LoopNum = 0;
     }
 };

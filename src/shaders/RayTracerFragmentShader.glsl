@@ -19,6 +19,9 @@ uniform int nTriangles;
 uniform samplerBuffer nodes;
 uniform int nNodes;
 
+uniform float randOrigin;
+uniform Camera camera;
+
 // 三角面参数
 // --------
 struct Triangle {
@@ -106,8 +109,33 @@ float randcore(uint seed) {
 // --------
 float rand() { return randcore(wseed); }
 
-uniform float randOrigin;
-uniform Camera camera;
+// 1 ~ 8 维的 sobol 生成矩阵
+const uint V[8*32] = {
+2147483648u,1073741824u,536870912u,268435456u,134217728u,67108864u,33554432u,16777216u,8388608u,4194304u,2097152u,1048576u,524288u,262144u,131072u,65536u,32768u,16384u,8192u,4096u,2048u,1024u,512u,256u,128u,64u,32u,16u,8u,4u,2u,1u,2147483648u,3221225472u,2684354560u,4026531840u,2281701376u,3422552064u,2852126720u,4278190080u,2155872256u,3233808384u,2694840320u,4042260480u,2290614272u,3435921408u,2863267840u,4294901760u,2147516416u,3221274624u,2684395520u,4026593280u,2281736192u,3422604288u,2852170240u,4278255360u,2155905152u,3233857728u,2694881440u,4042322160u,2290649224u,3435973836u,2863311530u,4294967295u,2147483648u,3221225472u,1610612736u,2415919104u,3892314112u,1543503872u,2382364672u,3305111552u,1753219072u,2629828608u,3999268864u,1435500544u,2154299392u,3231449088u,1626210304u,2421489664u,3900735488u,1556135936u,2388680704u,3314585600u,1751705600u,2627492864u,4008611328u,1431684352u,2147543168u,3221249216u,1610649184u,2415969680u,3892340840u,1543543964u,2382425838u,3305133397u,2147483648u,3221225472u,536870912u,1342177280u,4160749568u,1946157056u,2717908992u,2466250752u,3632267264u,624951296u,1507852288u,3872391168u,2013790208u,3020685312u,2181169152u,3271884800u,546275328u,1363623936u,4226424832u,1977167872u,2693105664u,2437829632u,3689389568u,635137280u,1484783744u,3846176960u,2044723232u,3067084880u,2148008184u,3222012020u,537002146u,1342505107u,2147483648u,1073741824u,536870912u,2952790016u,4160749568u,3690987520u,2046820352u,2634022912u,1518338048u,801112064u,2707423232u,4038066176u,3666345984u,1875116032u,2170683392u,1085997056u,579305472u,3016343552u,4217741312u,3719483392u,2013407232u,2617981952u,1510979072u,755882752u,2726789248u,4090085440u,3680870432u,1840435376u,2147625208u,1074478300u,537900666u,2953698205u,2147483648u,1073741824u,1610612736u,805306368u,2818572288u,335544320u,2113929216u,3472883712u,2290089984u,3829399552u,3059744768u,1127219200u,3089629184u,4199809024u,3567124480u,1891565568u,394297344u,3988799488u,920674304u,4193267712u,2950604800u,3977188352u,3250028032u,129093376u,2231568512u,2963678272u,4281226848u,432124720u,803643432u,1633613396u,2672665246u,3170194367u,2147483648u,3221225472u,2684354560u,3489660928u,1476395008u,2483027968u,1040187392u,3808428032u,3196059648u,599785472u,505413632u,4077912064u,1182269440u,1736704000u,2017853440u,2221342720u,3329785856u,2810494976u,3628507136u,1416089600u,2658719744u,864310272u,3863387648u,3076993792u,553150080u,272922560u,4167467040u,1148698640u,1719673080u,2009075780u,2149644390u,3222291575u,2147483648u,1073741824u,2684354560u,1342177280u,2281701376u,1946157056u,436207616u,2566914048u,2625634304u,3208642560u,2720006144u,2098200576u,111673344u,2354315264u,3464626176u,4027383808u,2886631424u,3770826752u,1691164672u,3357462528u,1993345024u,3752330240u,873073152u,2870150400u,1700563072u,87021376u,1097028000u,1222351248u,1560027592u,2977959924u,23268898u,437609937u
+};
+
+// 格林码
+uint grayCode(uint i) {
+    return i ^ (i>>1);
+}
+
+// 生成第 d 维度的第 i 个 sobol 数
+float sobol(uint d, int i) {
+    uint result = 0;
+    uint offset = d * 32;
+    for(uint j = 0; i != 0; i >>= 1, j++)
+    if((i & 1) != 0)
+    result ^= V[j+offset];
+
+    return float(result) * (1.0f/float(0xFFFFFFFFU));
+}
+
+// 生成第 i 帧的第 b 次反弹需要的二维随机向量
+vec2 sobolVec2(uint i, uint b) {
+    float u = sobol(b*2, grayCode(i));
+    float v = sobol(b*2+1, grayCode(i));
+    return vec2(u, v);
+}
 
 // 获取第 i 下标的三角形
 // ------------------
@@ -207,10 +235,14 @@ vec3 sampleHdr(vec3 v) {
 
 // 半球均匀采样
 // ----------
-vec3 SampleHemisphere() {
-    float z = rand();
+vec3 SampleHemisphere(float xi_1, float xi_2) {
+//    float z = rand();
+//    float r = max(0, sqrt(1.0 - z*z));
+//    float phi = 2.0 * PI * rand();
+//    return vec3(r * cos(phi), r * sin(phi), z);
+    float z = xi_1;
     float r = max(0, sqrt(1.0 - z*z));
-    float phi = 2.0 * PI * rand();
+    float phi = 2.0 * PI * xi_2;
     return vec3(r * cos(phi), r * sin(phi), z);
 }
 
@@ -222,6 +254,20 @@ vec3 toNormalHemisphere(vec3 v, vec3 N) {
     vec3 tangent = normalize(cross(N, helper));
     vec3 bitangent = normalize(cross(N, tangent));
     return v.x * tangent + v.y * bitangent + v.z * N;
+}
+
+
+void getTangent(vec3 N, inout vec3 tangent, inout vec3 bitangent) {
+    /*
+    vec3 helper = vec3(0, 0, 1);
+    if(abs(N.z)>0.999) helper = vec3(0, -1, 0);
+    tangent = normalize(cross(N, helper));
+    bitangent = normalize(cross(N, tangent));
+    */
+    vec3 helper = vec3(1, 0, 0);
+    if(abs(N.x)>0.999) helper = vec3(0, 0, 1);
+    bitangent = normalize(cross(N, helper));
+    tangent = normalize(cross(N, bitangent));
 }
 
 // 三角形求交
@@ -372,6 +418,107 @@ HitRecord hitBVH(Ray ray) {
     return rec;
 }
 
+float sqr(float x) {
+    return x*x;
+}
+
+float SchlickFresnel(float u) {
+    float m = clamp(1-u, 0, 1);
+    float m2 = m * m;
+    return m2 * m2 * m; // pow(m,5)
+}
+
+float GTR1(float NdotH, float a) {
+    if (a >= 1) return 1/PI;
+    float a2 = a*a;
+    float t = 1 + (a2-1) * NdotH * NdotH;
+    return (a2-1) / (PI * log(a2) * t);
+}
+
+float GTR2(float NdotH, float a) {
+    float a2 = a*a;
+    float t = 1 + (a2-1) * NdotH * NdotH;
+    return a2 / (PI * t*t);
+}
+
+float GTR2_aniso(float NdotH, float HdotX, float HdotY, float ax, float ay) {
+    return 1 / (PI * ax*ay * sqr( sqr(HdotX/ax) + sqr(HdotY/ay) + NdotH*NdotH ));
+}
+
+float smithG_GGX(float NdotV, float alphaG) {
+    float a = alphaG*alphaG;
+    float b = NdotV*NdotV;
+    return 1 / (NdotV + sqrt(a + b - a*b));
+}
+
+// 弃用
+float smithG_GGX_aniso(float NdotV, float VdotX, float VdotY, float ax, float ay) {
+    return 1 / (NdotV + sqrt( sqr(VdotX*ax) + sqr(VdotY*ay) + sqr(NdotV) ));
+}
+
+vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material) {
+    float NdotL = dot(N, L);
+    float NdotV = dot(N, V);
+    if(NdotL < 0 || NdotV < 0) return vec3(0);
+
+    vec3 H = normalize(L + V);
+    float NdotH = dot(N, H);
+    float LdotH = dot(L, H);
+
+    // 各种颜色
+    vec3 Cdlin = material.baseColor;
+    float Cdlum = 0.3 * Cdlin.r + 0.6 * Cdlin.g  + 0.1 * Cdlin.b;
+    vec3 Ctint = (Cdlum > 0) ? (Cdlin/Cdlum) : (vec3(1));
+    vec3 Cspec = material.specular * mix(vec3(1), Ctint, material.specularTint);
+    vec3 Cspec0 = mix(0.08*Cspec, Cdlin, material.metallic); // 0° 镜面反射颜色
+    vec3 Csheen = mix(vec3(1), Ctint, material.sheenTint);   // 织物颜色
+
+    // 漫反射 Fd
+    float Fd90 = 0.5 + 2.0 * LdotH * LdotH * material.roughness;
+    float FL = SchlickFresnel(NdotL);
+    float FV = SchlickFresnel(NdotV);
+    float Fd = mix(1.0, Fd90, FL) * mix(1.0, Fd90, FV);
+
+    // 次表面散射 ss
+    float Fss90 = LdotH * LdotH * material.roughness;
+    float Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV);
+    float ss = 1.25 * (Fss * (1.0 / (NdotL + NdotV) - 0.5) + 0.5);
+
+    /*
+    // 镜面反射 -- 各向同性
+    float alpha = material.roughness * material.roughness;
+    float Ds = GTR2(NdotH, alpha);
+    float FH = SchlickFresnel(LdotH);
+    vec3 Fs = mix(Cspec0, vec3(1), FH);
+    float Gs = smithG_GGX(NdotL, material.roughness);
+    Gs *= smithG_GGX(NdotV, material.roughness);
+    */
+    // 镜面反射 -- 各向异性
+    float aspect = sqrt(1.0 - material.anisotropic * 0.9);
+    float ax = max(0.001, sqr(material.roughness)/aspect);
+    float ay = max(0.001, sqr(material.roughness)*aspect);
+    float Ds = GTR2_aniso(NdotH, dot(H, X), dot(H, Y), ax, ay);
+    float FH = SchlickFresnel(LdotH);
+    vec3 Fs = mix(Cspec0, vec3(1), FH);
+    float Gs;
+    Gs  = smithG_GGX_aniso(NdotL, dot(L, X), dot(L, Y), ax, ay);
+    Gs *= smithG_GGX_aniso(NdotV, dot(V, X), dot(V, Y), ax, ay);
+
+    // 清漆
+    float Dr = GTR1(NdotH, mix(0.1, 0.001, material.clearcoatGloss));
+    float Fr = mix(0.04, 1.0, FH);
+    float Gr = smithG_GGX(NdotL, 0.25) * smithG_GGX(NdotV, 0.25);
+
+    // sheen
+    vec3 Fsheen = FH * material.sheen * Csheen;
+
+    vec3 diffuse = (1.0/PI) * mix(Fd, ss, material.subsurface) * Cdlin + Fsheen;
+    vec3 specular = Gs * Fs * Ds;
+    vec3 clearcoat = vec3(0.25 * Gr * Fr * Dr * material.clearcoat);
+
+    return diffuse * (1.0 - material.metallic) + specular + clearcoat;
+}
+
 // 路径追踪着色
 // ----------
 vec3 shading(HitRecord hit) {
@@ -380,25 +527,34 @@ vec3 shading(HitRecord hit) {
     vec3 history = vec3(1);
 
     for (int i = 0; i < 2; i++) {
-        // 随机出射方向 wi
-        vec3 wi = toNormalHemisphere(SampleHemisphere(), hit.normal);
+
+        vec3 V = -hit.viewDir;
+        vec3 N = hit.normal;
+
+        vec2 uv = sobolVec2(frameCounter+1, bounce);
+        uv = CranleyPattersonRotation(uv);
+
+        vec3 L = SampleHemisphere(uv.x, uv.y);
+        L = toNormalHemisphere(L, hit.normal);                          // 出射方向 wi
+        float pdf = 1.0 / (2.0 * PI);                                   // 半球均匀采样概率密度
+        float cosine_o = max(0, dot(V, N));         // 入射光和法线夹角余弦
+        float cosine_i = max(0, dot(L, hit.normal));  // 出射光和法线夹角余弦
+        vec3 tangent, bitangent;
+        getTangent(N, tangent, bitangent);
+        vec3 f_r = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material);
+        // vec3 f_r = hit.material.baseColor / PI;                         // 漫反射 BRDF
 
         // 漫反射: 随机发射光线
         Ray randomRay;
         randomRay.origin = hit.hitPoint;
-        randomRay.direction = wi;
-//        HitRecord newHit = hitArray(randomRay, 0, nTriangles - 1);
+        randomRay.direction = L;
+        // HitRecord newHit = hitArray(randomRay, 0, nTriangles - 1);
         HitRecord newHit = hitBVH(randomRay);
-
-        float pdf = 1.0 / (2.0 * PI);                                   // 半球均匀采样概率密度
-        float cosine_o = max(0, dot(-hit.viewDir, hit.normal));         // 入射光和法线夹角余弦
-        float cosine_i = max(0, dot(randomRay.direction, hit.normal));  // 出射光和法线夹角余弦
-        vec3 f_r = hit.material.baseColor / PI;                         // 漫反射 BRDF
 
         // 未命中
         if(!newHit.isHit) {
-//            vec3 skyColor = vec3(0);
-            vec3 skyColor = sampleHdr(randomRay.direction);
+            vec3 skyColor = vec3(0);
+//            vec3 skyColor = sampleHdr(randomRay.direction);
             Lo += history * skyColor * f_r * cosine_i / pdf;
             break;
         }
@@ -455,7 +611,7 @@ void main() {
         curColor = vec3(0);
 //        float t = 0.5 * (cameraRay.direction.y + 1.0);
 //        curColor = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-        curColor = sampleHdr(cameraRay.direction);
+//        curColor = sampleHdr(cameraRay.direction);
     } else {
         vec3 Le = firstHit.material.emissive;
         vec3 Li = shading(firstHit);

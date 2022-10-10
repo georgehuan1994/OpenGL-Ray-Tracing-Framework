@@ -36,8 +36,6 @@ void processInput(GLFWwindow *window);
 // settings
 const unsigned int SCR_WIDTH = 1280;
 const unsigned int SCR_HEIGHT = 720;
-// const unsigned int SCENE_WIDTH = 512;
-// const unsigned int SCENE_HEIGHT = 512;
 
 #define RENDER_SCALE 1
 
@@ -47,10 +45,10 @@ float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
-// timing
+// timer
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
-float fps;
+float fps = 0.0f;
 
 // screen FBO
 RenderBuffer screenBuffer;
@@ -101,14 +99,7 @@ int main() {
 
     // build and compile shaders
     // -------------------------
-    // Shader ourShader("../../src/shaders/1.model_loading.vs",
-    //                  "../../src/shaders/1.model_loading.fs");
-
-    // Shader ourShader("../../src/shaders/vertexShader.glsl",
-    //                  "../../src/shaders/fragmentShader.glsl");
-
-    Shader RayTracerShader("../../src/shaders/RayTracerVertexShader.glsl",
-                           "../../src/shaders/RayTracerFragmentShader.glsl");
+    Shader RayTracerShader("../../src/shaders/RayTracerVertexShader.glsl","../../src/shaders/RayTracerFragmentShader.glsl");
     Shader ScreenShader("../../src/shaders/ScreenVertexShader.glsl", "../../src/shaders/ScreenFragmentShader.glsl");
 
     // load models
@@ -144,32 +135,50 @@ int main() {
     cornell_box_light.baseColor = vec3(1, 1, 1);
     cornell_box_light.emissive = vec3(15, 15, 15);
 
-   getTriangle(quad.meshes, triangles, cornell_box_white,
-               getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-   getTriangle(quad.meshes, triangles, cornell_box_white,
-               getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-   getTriangle(quad.meshes, triangles, cornell_box_white,
-               getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -11), vec3(11.1, 11.1, 0.2)), false);
-   getTriangle(quad.meshes, triangles, cornell_box_green,
-               getTransformMatrix(vec3(0, 0, 0), vec3(-5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-   getTriangle(quad.meshes, triangles, cornell_box_red,
-               getTransformMatrix(vec3(0, 0, 0), vec3(5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-   getTriangle(quad.meshes, triangles, cornell_box_light,
-               getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.49, -5.5), vec3(2.6, 0.1, 2.1)), false);
-   getTriangle(quad.meshes, triangles, cornell_box_white,
-               getTransformMatrix(vec3(0, 15, 0), vec3(-1.65, -2.2, -7.5), vec3(3.2, 6.6, 3.2)), false);
-   getTriangle(sphere.meshes, triangles, cornell_box_white,
-               getTransformMatrix(vec3(0, 0, 0), vec3(1.65, -3.9, -5), vec3(3.2, 3.2, 3.2)), false);
+//   getTriangle(quad.meshes, triangles, cornell_box_white,
+//               getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
+//   getTriangle(quad.meshes, triangles, cornell_box_white,
+//               getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
+//   getTriangle(quad.meshes, triangles, cornell_box_white,
+//               getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -11), vec3(11.1, 11.1, 0.2)), false);
+//   getTriangle(quad.meshes, triangles, cornell_box_green,
+//               getTransformMatrix(vec3(0, 0, 0), vec3(-5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
+//   getTriangle(quad.meshes, triangles, cornell_box_red,
+//               getTransformMatrix(vec3(0, 0, 0), vec3(5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
+//   getTriangle(quad.meshes, triangles, cornell_box_light,
+//               getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.49, -5.5), vec3(2.6, 0.1, 2.1)), false);
+//   getTriangle(quad.meshes, triangles, cornell_box_white,
+//               getTransformMatrix(vec3(0, 15, 0), vec3(-1.65, -2.2, -7.5), vec3(3.2, 6.6, 3.2)), false);
+//   getTriangle(sphere.meshes, triangles, cornell_box_white,
+//               getTransformMatrix(vec3(0, 0, 0), vec3(1.65, -3.9, -5), vec3(3.2, 3.2, 3.2)), false);
 
-   // bunny
-   //  getTriangle(bunny.meshes, triangles, cornell_box_white,
-   //              getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(2, 2, 2)), false);
-   //  getTriangle(plate.meshes, triangles, cornell_box_white,
-   //              getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(10, 10, 10)), false);
-   //  getTriangle(floor.meshes, triangles, cornell_box_white,
-   //              getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(200, 200, 200)), false);
-   //  getTriangle(floor.meshes, triangles, cornell_box_light,
-   //              getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -5), vec3(1.5, 1, 10)), false);
+    camera.Front = vec3(0, -0.23, -0.97);
+    camera.Up = vec3(0, 0.97, -0.23);
+    camera.Zoom = 25.0f;
+
+    Material jade;
+    jade.baseColor = vec3(0.55, 0.78, 0.55);
+    jade.roughness = 0.1;
+    jade.specular = 1.0;
+    jade.subsurface = 1.0;
+
+    Material golden;
+    golden.baseColor = vec3(0.5, 1, 0.5);
+    golden.baseColor = vec3(0.75, 0.7, 0.15);
+    golden.roughness = 0.15;
+    golden.metallic = 1.0;
+    golden.clearcoat = 1.0;
+
+    // bunny
+    getTriangle(bunny.meshes, triangles, jade,
+                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.2, -5), vec3(2, 2, 2)), false);
+
+    getTriangle(plate.meshes, triangles, cornell_box_white,
+                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(20, 10, 5)), false);
+    getTriangle(floor.meshes, triangles, cornell_box_white,
+                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(200, 200, 200)), false);
+    getTriangle(floor.meshes, triangles, cornell_box_light,
+                getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -5), vec3(1.5, 1, 10)), false);
 #pragma endregion
 
     int nTriangles = triangles.size();
@@ -263,74 +272,54 @@ int main() {
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
+    camera.Refresh();
 
     // 渲染循环
     // -------
     while (!glfwWindowShouldClose(window)) {
-        // per-frame time logic
-        // --------------------
-        float currentFrame = static_cast<float>(glfwGetTime());
+        auto currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
         lastFrame = currentFrame;
         fps = 1.0f / deltaTime;
 
-        // input
-        // -----
         processInput(window);
 
-        // imgui
-        // -----
         ImGui_ImplOpenGL3_NewFrame();
         ImGui_ImplGlfw_NewFrame();
         ImGui::NewFrame();
 
-        ShowAppMainMenuBar();
         glfwGetFramebufferSize(window, &width, &height);
-        const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-        static float f = 0.0f;
-        static int counter = 0;
-        ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 0, main_viewport->WorkPos.y + 0));
-#ifdef __APPLE__
-        ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 1.5, height / 2.0));
-#else
-        ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 3.0, height));
-#endif
-        ImGuiWindowFlags window_flags = 0;
-        window_flags |= ImGuiWindowFlags_NoTitleBar;
-        window_flags |= ImGuiWindowFlags_NoMove;
-        window_flags |= ImGuiWindowFlags_NoResize;
-        ImGui::Begin("Inspector", nullptr, window_flags);
-        ImGui::Text("RMB: look around");
-        ImGui::Text("MMB: zoom the view");
-        ImGui::Text("WASD: move camera");
-        ImGui::Separator();
-        ImGui::Text("Screen Buffer Size: (%d x %d)", width, height);
-        ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        ImGui::Text("Iterations: %d", camera.LoopNum);
-        ImGui::Separator();
-        ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camera.Position.x, camera.Position.y, camera.Position.z);
-        ImGui::Text("Camera Front: (%.2f, %.2f, %.2f)", camera.Front.x, camera.Front.y, camera.Front.z);
-        ImGui::Text("Camera Up: (%.2f, %.2f, %.2f)", camera.Up.x, camera.Up.y, camera.Up.z);
-        ImGui::Text("Camera Zoom: %.2f", camera.Zoom);
-        ImGui::Separator();
-        ImGui::Checkbox("Demo Window", &show_demo_window);
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
-//        ImGui::Checkbox("Another Window", &show_another_window);
-//        ImGui::SliderFloat("float", &f, 0.0f, 1.0f);
-//        ImGui::ColorEdit3("clear color", (float*)&clear_color);
-//        if (ImGui::Button("Button"))
-//            counter++;
-//        ImGui::SameLine();
-//        ImGui::Text("counter = %d", counter);
-        ImGui::End();
+       // const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
+       // ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 0, main_viewport->WorkPos.y + 0));
+// #ifdef __APPLE__
+//        ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 1.5, height / 2.0));
+// #else
+//        ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 3.0, height));
+// #endif
+       ImGuiWindowFlags window_flags = 0;
+        window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+       ImGui::Begin("Inspector", nullptr, window_flags);
+       ImGui::Text("RMB: look around");
+       ImGui::Text("MMB: zoom the view");
+       ImGui::Text("WASD: move camera");
+       ImGui::Separator();
+       ImGui::Text("Screen Buffer Size: (%d x %d)", width, height);
+       ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+       ImGui::Text("Iterations: %d", camera.LoopNum);
+       ImGui::Separator();
+       ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camera.Position.x, camera.Position.y, camera.Position.z);
+       ImGui::Text("Camera Front: (%.2f, %.2f, %.2f)", camera.Front.x, camera.Front.y, camera.Front.z);
+       ImGui::Text("Camera Up: (%.2f, %.2f, %.2f)", camera.Up.x, camera.Up.y, camera.Up.z);
+       ImGui::Text("Camera Zoom: %.2f", camera.Zoom);
+       ImGui::Separator();
+       ImGui::Checkbox("Demo Window", &show_demo_window);
+       if (show_demo_window)
+           ImGui::ShowDemoWindow(&show_demo_window);
+       ImGui::End();
 
         // render
         // ------
         camera.LoopIncrease();
-//        std::cout << "\r";
-//        std::cout << std::fixed << std::setprecision(2) << "FPS : " << fps << "    迭代次数: " << camera.LoopNum;
-
         {
             screenBuffer.setCurrentBuffer(camera.LoopNum);
 
@@ -344,9 +333,9 @@ int main() {
             glBindTexture(GL_TEXTURE_BUFFER, nodesTextureBuffer);
             RayTracerShader.setInt("nodes", 2);
 
-            glActiveTexture(GL_TEXTURE0 + 3);
-            glBindTexture(GL_TEXTURE_2D, hdrMap);
-            RayTracerShader.setInt("hdrMap", 3);
+            // glActiveTexture(GL_TEXTURE0 + 3);
+            // glBindTexture(GL_TEXTURE_2D, hdrMap);
+            // RayTracerShader.setInt("hdrMap", 3);
 
             RayTracerShader.use();
             RayTracerShader.setVec3("camera.position", camera.Position);
@@ -370,28 +359,7 @@ int main() {
             screenBuffer.setCurrentAsTexture(camera.LoopNum);
 
             ScreenShader.setInt("screenTexture", 0);
-            // screen.DrawScreen();
-
-            ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + width / 10.0 * 1.5, main_viewport->WorkPos.y + 0));
-#ifdef __APPLE__
-            ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 3.5, height / 2.0));
-#else
-            ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 7.0, height));
-#endif
-            ImGuiWindowFlags scene_view_flags = 0;
-            scene_view_flags |= ImGuiWindowFlags_NoTitleBar;
-            scene_view_flags |= ImGuiWindowFlags_NoScrollbar;
-            scene_view_flags |= ImGuiWindowFlags_NoMove;
-            scene_view_flags |= ImGuiWindowFlags_NoResize;
-            ImGui::Begin("Scene View", nullptr, scene_view_flags);
-#ifdef __APPLE__
-            ImGui::Image((void *) (intptr_t) screenBuffer.getCurrentTexture(camera.LoopNum),
-                         ImVec2(width / 2.0, height / 2.0), ImVec2(0, 1), ImVec2(1, 0));
-#else
-            ImGui::Image((void *) (intptr_t) screenBuffer.getCurrentTexture(camera.LoopNum),
-                         ImVec2(width, height), ImVec2(0, 1), ImVec2(1, 0));
-#endif
-            ImGui::End();
+            screen.DrawScreen();
         }
 
         // // view/projection transformations
@@ -416,14 +384,10 @@ int main() {
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 
-        // glfw: swap buffers and poll IO events (keys pressed/released, mouse moved etc.)
-        // -------------------------------------------------------------------------------
         glfwSwapBuffers(window);
         glfwPollEvents();
     }
 
-    // glfw: terminate, clearing all previously allocated GLFW resources.
-    // ------------------------------------------------------------------
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplGlfw_Shutdown();
     ImGui::DestroyContext();
@@ -436,8 +400,6 @@ int main() {
     return 0;
 }
 
-// process all input: query GLFW whether relevant keys are pressed/released this frame and react accordingly
-// ---------------------------------------------------------------------------------------------------------
 void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS)
         glfwSetWindowShouldClose(window, true);
@@ -450,23 +412,15 @@ void processInput(GLFWwindow *window) {
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
-
-    // std::cout << "Camera Position: " << camera.Position.x << ", " << camera.Position.y << ", " << camera.Position.z << std::endl;
 }
 
-// glfw: whenever the window size changed (by OS or user resize) this callback function executes
-// ---------------------------------------------------------------------------------------------
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
-    // make sure the viewport matches the new window dimensions; note that width and
-    // height will be significantly larger than specified on retina displays.
     glfwGetFramebufferSize(window, &width, &height);
     camera.ProcessScreenRatio(width * RENDER_SCALE, height * RENDER_SCALE);
     screenBuffer.Resize(width * RENDER_SCALE, height * RENDER_SCALE);
     glViewport(0, 0, width * RENDER_SCALE, height * RENDER_SCALE);
 }
 
-// glfw: whenever the mouse moves, this callback is called
-// -------------------------------------------------------
 void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
     float xpos = static_cast<float>(xposIn);
     float ypos = static_cast<float>(yposIn);
@@ -478,7 +432,7 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
     }
 
     float xoffset = xpos - lastX;
-    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+    float yoffset = lastY - ypos;
 
     lastX = xpos;
     lastY = ypos;
@@ -488,10 +442,7 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
     }
 }
 
-// glfw: whenever the mouse scroll wheel scrolls, this callback is called
-// ----------------------------------------------------------------------
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
     camera.ProcessMouseScroll(static_cast<float>(yoffset));
-    // std::cout << "Camera Zoom: " << camera.Zoom << std::endl;
 }
 
