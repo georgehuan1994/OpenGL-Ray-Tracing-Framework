@@ -21,6 +21,9 @@ uniform int nNodes;
 
 uniform float randOrigin;
 
+uniform bool enableImportantSample;
+uniform bool enableEnvMap;
+
 // 三角面参数
 // --------
 struct Triangle {
@@ -240,13 +243,16 @@ vec3 sampleHdr(vec3 v) {
     return color;
 }
 
+vec3 SampleHemisphere() {
+    float z = rand();
+    float r = max(0, sqrt(1.0 - z*z));
+    float phi = 2.0 * PI * rand();
+    return vec3(r * cos(phi), r * sin(phi), z);
+}
+
 // 半球均匀采样
 // ----------
 vec3 SampleHemisphere(float xi_1, float xi_2) {
-//    float z = rand();
-//    float r = max(0, sqrt(1.0 - z*z));
-//    float phi = 2.0 * PI * rand();
-//    return vec3(r * cos(phi), r * sin(phi), z);
     float z = xi_1;
     float r = max(0, sqrt(1.0 - z*z));
     float phi = 2.0 * PI * xi_2;
@@ -517,13 +523,16 @@ HitRecord hitBVH(Ray ray) {
 }
 
 vec2 CranleyPattersonRotation(vec2 p) {
-    uint pseed = uint(
-    uint((TexCoords.x * 0.5 + 0.5) * screenWidth)  * uint(1973) +
-    uint((TexCoords.y * 0.5 + 0.5) * screenHeight) * uint(9277) +
-    uint(114514/1919) * uint(26699)) | uint(1);
+//    uint pseed = uint(
+//    uint((TexCoords.x * 0.5 + 0.5) * screenWidth)  * uint(1973) +
+//    uint((TexCoords.y * 0.5 + 0.5) * screenHeight) * uint(9277) +
+//    uint(114514/1919) * uint(26699)) | uint(1);
+//
+//    float u = randcore(pseed);
+//    float v = randcore(pseed);
 
-    float u = randcore(pseed);
-    float v = randcore(pseed);
+    float u = rand();
+    float v = rand();
 
     p.x += u;
     if(p.x>1) p.x -= 1;
@@ -607,6 +616,7 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material)
     float Gs = smithG_GGX(NdotL, material.roughness);
     Gs *= smithG_GGX(NdotV, material.roughness);
     */
+
     // 镜面反射 -- 各向异性
     float aspect = sqrt(1.0 - material.anisotropic * 0.9);
     float ax = max(0.001, sqr(material.roughness)/aspect);
@@ -736,63 +746,63 @@ vec3 shading(HitRecord hit) {
     vec3 Lo = vec3(0);
     vec3 history = vec3(1);
 
-    for (int i = 0; i < 2; i++) {
+    for (int i = 0; i < 4; i++) {
 
         vec3 V = -hit.viewDir;
         vec3 N = hit.normal;
 
-        // 获取 3 个随机数
-        vec2 uv = sobolVec2(camera.loopNum + 1, i);
-        uv = CranleyPattersonRotation(uv);
-        float xi_1 = uv.x;
-        float xi_2 = uv.y;
-        float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
+//        // 获取 3 个随机数
+//        vec2 uv = sobolVec2(camera.loopNum + 1, i);
+//        uv = CranleyPattersonRotation(uv);
+//        float xi_1 = uv.x;
+//        float xi_2 = uv.y;
+////        float xi_1 = rand();
+////        float xi_2 = rand();
+//        float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
+//
+//        // 采样 BRDF 得到一个方向 L
+//        vec3 L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
+//        float NdotL = dot(N, L);
+//        if(NdotL <= 0.0) break;
+//
+//        // 获取 L 方向上的 BRDF 值和概率密度
+//        vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
+//        float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+//        if(pdf_brdf <= 0.0) break;
 
-        // 采样 BRDF 得到一个方向 L
-        vec3 L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
-        float NdotL = dot(N, L);
-        if(NdotL <= 0.0) break;
-
-        // 获取 L 方向上的 BRDF 值和概率密度
-        vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
-        float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
-        if(pdf_brdf <= 0.0) break;
-
-//        vec3 L = SampleHemisphere(uv.x, uv.y);
-//        L = toNormalHemisphere(L, hit.normal);                          // 出射方向 wi
-//        float pdf = 1.0 / (2.0 * PI);                                   // 半球均匀采样概率密度
-//        float cosine_o = max(0, dot(V, N));         // 入射光和法线夹角余弦
-//        float cosine_i = max(0, dot(L, hit.normal));  // 出射光和法线夹角余弦
-//        vec3 tangent, bitangent;
-//        getTangent(N, tangent, bitangent);
-//        vec3 f_r = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material);
-//        // vec3 f_r = hit.material.baseColor / PI;                         // 漫反射 BRDF
+        vec3 L = toNormalHemisphere(SampleHemisphere(), hit.normal);// 出射方向 wi
+        float pdf = 1.0 / (2.0 * PI);                                   // 半球均匀采样概率密度
+        float cosine_o = max(0, dot(V, N));         // 入射光和法线夹角余弦
+        float cosine_i = max(0, dot(L, hit.normal));  // 出射光和法线夹角余弦
+        vec3 tangent, bitangent;
+        getTangent(N, tangent, bitangent);
+        vec3 f_r = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material);
+//         vec3 f_r = hit.material.baseColor / PI;                         // 漫反射 BRDF
 
         // 漫反射: 随机发射光线
         Ray randomRay;
         randomRay.origin = hit.hitPoint;
         randomRay.direction = L;
-        // HitRecord newHit = hitArray(randomRay, 0, nTriangles - 1);
         HitRecord newHit = hitBVH(randomRay);
 
         // 未命中
         if(!newHit.isHit) {
 //            vec3 skyColor = vec3(0);
             vec3 skyColor = sampleHdr(randomRay.direction);
-            Lo += history * skyColor * f_r * NdotL / pdf_brdf;
-//            Lo += history * skyColor * f_r * cosine_i / pdf;
+//            Lo += history * skyColor * f_r * NdotL / pdf_brdf;
+            Lo += history * skyColor * f_r * cosine_i / pdf;
             break;
         }
 
         // 命中光源积累颜色
         vec3 Le = newHit.material.emissive;
-        Lo += history * Le * f_r * NdotL / pdf_brdf;
-//        Lo += history * Le * f_r * cosine_i / pdf;
+//        Lo += history * Le * f_r * NdotL / pdf_brdf;
+        Lo += history * Le * f_r * cosine_i / pdf;
 
         // 递归(步进)
         hit = newHit;
-        history *= f_r * NdotL / pdf_brdf;  // 累积颜色
-//        history *= f_r * cosine_i / pdf;  // 累积颜色
+//        history *= f_r * NdotL / pdf_brdf;  // 累积颜色
+        history *= f_r * cosine_i / pdf;  // 累积颜色
     }
     return Lo;
 }
@@ -801,35 +811,17 @@ vec3 shading(HitRecord hit) {
 void main() {
 
     wseed = uint(randOrigin * float(6.95857) * (TexCoords.x * TexCoords.y));
+
+//    wseed = uint(
+//    uint((TexCoords.x * 0.5 + 0.5) * screenWidth)  * uint(1973) +
+//    uint((TexCoords.y * 0.5 + 0.5) * screenHeight) * uint(9277) +
+//    uint(camera.loopNum) * uint(26699)) | uint(1);
+
     vec3 hist = texture(historyTexture, TexCoords).rgb;
 
     Ray cameraRay;
     cameraRay.origin = camera.position;
     cameraRay.direction = normalize(camera.leftBottomCorner + (TexCoords.x * 2.0 * camera.halfW) * camera.right + (TexCoords.y * 2.0 * camera.halfH) * camera.up);
-
-    //    BVHNode node = getBVHNode(1);
-    //    BVHNode left = getBVHNode(node.left);
-    //    BVHNode right = getBVHNode(node.right);
-    //
-    //    float r1 = hitAABB(cameraRay, left.AA, left.BB);
-    //    float r2 = hitAABB(cameraRay, right.AA, right.BB);
-
-    ////    vec3 color;
-    //    if(r1>0) FragColor = vec4(1, 0, 0, 1);
-    //    if(r2>0) FragColor = vec4(0, 1, 0, 1);
-    //    if(r1>0 && r2>0) FragColor = vec4(1, 1, 0, 1);
-
-    //        for(int i = 0; i < nNodes; i++) {
-    //            BVHNode node = getBVHNode(i);
-    //            if(node.n > 0) {
-    //                int L = node.index;
-    //                int R = node.index + node.n - 1;
-    //                HitRecord res = hitArray(cameraRay, L, R);
-    //                if(res.isHit) FragColor = vec4(res.material.baseColor, 1);
-    //            }
-    //        }
-
-    //    HitRecord firstHit = hitArray(cameraRay, 0, nTriangles - 1);
     HitRecord firstHit = hitBVH(cameraRay);
 
     vec3 curColor = vec3(0);

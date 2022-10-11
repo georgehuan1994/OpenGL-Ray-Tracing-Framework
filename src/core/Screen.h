@@ -54,7 +54,7 @@ public:
 
         glGenTextures(1, &textureColorbuffer);
         glBindTexture(GL_TEXTURE_2D, textureColorbuffer);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGB, GL_FLOAT, nullptr);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, SCR_WIDTH, SCR_HEIGHT, 0, GL_RGBA, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -112,6 +112,7 @@ public:
     void Init(int SCR_WIDTH, int SCR_HEIGHT) {
         fbo[0].configuration(SCR_WIDTH, SCR_HEIGHT);
         fbo[1].configuration(SCR_WIDTH, SCR_HEIGHT);
+        fbo[2].configuration(SCR_WIDTH, SCR_HEIGHT);
         currentIndex = 0;
     }
 
@@ -133,6 +134,10 @@ public:
         fbo[curIndex].BindAsTexture();
     }
 
+    void setFinal() {
+
+    }
+
     unsigned int getCurrentTexture(int LoopNum) {
         int histIndex = LoopNum % 2;
         int curIndex = (histIndex == 0 ? 1 : 0);
@@ -142,10 +147,11 @@ public:
     void Delete() {
         fbo[0].Delete();
         fbo[1].Delete();
+        fbo[2].Delete();
     }
 private:
     int currentIndex;
-    ScreenFBO fbo[2];
+    ScreenFBO fbo[3];
 };
 
 

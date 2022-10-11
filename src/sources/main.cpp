@@ -34,8 +34,8 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 // settings
-const unsigned int SCR_WIDTH = 1280;
-const unsigned int SCR_HEIGHT = 720;
+const unsigned int SCR_WIDTH = 512;
+const unsigned int SCR_HEIGHT = 512;
 
 #define RENDER_SCALE 1
 
@@ -96,19 +96,23 @@ int main() {
     // glEnable(GL_DEPTH_TEST);
 
     CPURandomInit();
+    bool enableImportantSample = false;
+    bool enableEnvMap = true;
 
     // build and compile shaders
     // -------------------------
     Shader RayTracerShader("../../src/shaders/RayTracerVertexShader.glsl","../../src/shaders/RayTracerFragmentShader.glsl");
     Shader ScreenShader("../../src/shaders/ScreenVertexShader.glsl", "../../src/shaders/ScreenFragmentShader.glsl");
+    Shader ToneMappingShader("../../src/shaders/ToneMappingVertexShader.glsl", "../../src/shaders/ToneMappingFragmentShader.glsl");
 
     // load models
     // -----------
     Model sphere("../../resources/objects/sphere.obj");
     Model quad("../../resources/objects/quad.obj");
     Model bunny("../../resources/objects/bunny_4000.obj");
-    // Model plate("../../resources/objects/plate.obj");
-    // Model floor("../../resources/objects/floor.obj");
+    Model plate("../../resources/objects/plate.obj");
+    Model floor("../../resources/objects/floor.obj");
+    Model teapot("../../resources/objects/teapot.obj");
 
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
@@ -156,6 +160,10 @@ int main() {
     camera.Up = vec3(0, 0.97, -0.23);
     camera.Zoom = 25.0f;
 
+    Material white;
+    white.baseColor = vec3(0.73, 0.73, 0.73);
+    white.roughness = 1.0;
+
     Material jade;
     jade.baseColor = vec3(0.55, 0.78, 0.55);
     jade.roughness = 0.1;
@@ -163,22 +171,25 @@ int main() {
     jade.subsurface = 1.0;
 
     Material golden;
-    golden.baseColor = vec3(0.5, 1, 0.5);
     golden.baseColor = vec3(0.75, 0.7, 0.15);
-    golden.roughness = 0.15;
+    golden.roughness = 0.1;
+    golden.specular = 1.0;
     golden.metallic = 1.0;
     golden.clearcoat = 1.0;
 
     // bunny
-    getTriangle(sphere.meshes, triangles, golden,
+    // getTriangle(teapot.meshes, triangles, white,
+    //             getTransformMatrix(vec3(0, 90, 0), vec3(0, -5.2, -5), vec3(2, 2, 2)), false);
+
+    getTriangle(bunny.meshes, triangles, jade,
                 getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.2, -5), vec3(2, 2, 2)), false);
 
-    // getTriangle(plate.meshes, triangles, cornell_box_white,
+    // getTriangle(plate.meshes, triangles, white,
     //             getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(20, 10, 5)), false);
-    // getTriangle(floor.meshes, triangles, cornell_box_white,
+    // getTriangle(floor.meshes, triangles, white,
     //             getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(200, 200, 200)), false);
     // getTriangle(floor.meshes, triangles, cornell_box_light,
-    //             getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -5), vec3(1.5, 1, 10)), false);
+    //             getTransformMatrix(vec3(0, 0, 0), vec3(0, 5, -5), vec3(1.5, 1, 10)), false);
 #pragma endregion
 
     int nTriangles = triangles.size();
@@ -251,8 +262,7 @@ int main() {
 
     // HDR 全景图
     HDRLoaderResult hdrRes;
-   bool r = HDRLoader::load("../../resources/textures/hdr/newport_loft.hdr", hdrRes);
-//     bool r = HDRLoader::load("../../resources/textures/hdr/syferfontein_18d_clear_1k.hdr", hdrRes);
+    bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_4k.hdr", hdrRes);
     hdrMap = getTextureRGB32F(hdrRes.width, hdrRes.height);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, hdrRes.cols);
 
@@ -350,19 +360,31 @@ int main() {
             RayTracerShader.setFloat("randOrigin", 674764.0f * (GetCPURandom() + 1.0f));
             RayTracerShader.setInt("screenWidth", width);
             RayTracerShader.setInt("screenHeight", height);
+            RayTracerShader.setBool("enableImportantSample",enableImportantSample);
+            RayTracerShader.setBool("enableEnvMap",enableEnvMap);
             screen.DrawScreen();
         }
 
         {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
             ScreenShader.use();
             screenBuffer.setCurrentAsTexture(camera.LoopNum);
-
             ScreenShader.setInt("screenTexture", 0);
             screen.DrawScreen();
+        }
+
+        {
+            // glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            // glClearColor(0, 0, 0, 1.0f);
+            // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            //
+            // ToneMappingShader.use();
+            // screenBuffer.setCurrentAsTexture(camera.LoopNum);
+            // ToneMappingShader.setInt("texPass0", 0);
+            // screen.DrawScreen();
         }
 
         // // view/projection transformations
