@@ -23,6 +23,8 @@ uniform float randOrigin;
 
 uniform bool enableImportantSample;
 uniform bool enableEnvMap;
+uniform int maxBounce;
+uniform int maxIterations;
 
 // 三角面参数
 // --------
@@ -95,7 +97,6 @@ struct HitRecord {
 };
 
 uint wseed;
-float rand(void);
 
 float sqr(float x) {
     return x*x;
@@ -142,8 +143,8 @@ float sobol(int d, int i) {
 
 // 生成第 i 帧的第 b 次反弹需要的二维随机向量
 vec2 sobolVec2(int i, int b) {
-    float u = sobol(b*2, grayCode(i));
-    float v = sobol(b*2+1, grayCode(i));
+    float u = sobol(b * 2, grayCode(i));
+    float v = sobol(b * 2 + 1, grayCode(i));
     return vec2(u, v);
 }
 
@@ -243,6 +244,8 @@ vec3 sampleHdr(vec3 v) {
     return color;
 }
 
+// 半球均匀采样
+// ----------
 vec3 SampleHemisphere() {
     float z = rand();
     float r = max(0, sqrt(1.0 - z*z));
@@ -360,7 +363,8 @@ vec3 SampleBRDF(float xi_1, float xi_2, float xi_3, vec3 V, vec3 N, in Material 
 }
 
 
-
+// 获取切线和副切线
+// -------------
 void getTangent(vec3 N, inout vec3 tangent, inout vec3 bitangent) {
     /*
     vec3 helper = vec3(0, 0, 1);
@@ -545,6 +549,8 @@ vec2 CranleyPattersonRotation(vec2 p) {
     return p;
 }
 
+// Schlick 近似
+// -----------
 float SchlickFresnel(float u) {
     float m = clamp(1-u, 0, 1);
     float m2 = m * m;
@@ -739,6 +745,13 @@ float misMixWeight(float a, float b) {
     return t / (b*b + t);
 }
 
+// 默认天空盒
+// --------
+vec3 getDefaultSkyColor(float y) {
+    float t = 0.5 * (y + 1.0);
+    return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
+}
+
 // 路径追踪着色
 // ----------
 vec3 shading(HitRecord hit) {
@@ -746,34 +759,15 @@ vec3 shading(HitRecord hit) {
     vec3 Lo = vec3(0);
     vec3 history = vec3(1);
 
-    for (int i = 0; i < 4; i++) {
+    for (int i = 0; i < maxBounce; i++) {
 
         vec3 V = -hit.viewDir;
         vec3 N = hit.normal;
+        vec3 L = toNormalHemisphere(SampleHemisphere(), hit.normal);    // 出射方向 wi
 
-//        // 获取 3 个随机数
-//        vec2 uv = sobolVec2(camera.loopNum + 1, i);
-//        uv = CranleyPattersonRotation(uv);
-//        float xi_1 = uv.x;
-//        float xi_2 = uv.y;
-////        float xi_1 = rand();
-////        float xi_2 = rand();
-//        float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
-//
-//        // 采样 BRDF 得到一个方向 L
-//        vec3 L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
-//        float NdotL = dot(N, L);
-//        if(NdotL <= 0.0) break;
-//
-//        // 获取 L 方向上的 BRDF 值和概率密度
-//        vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
-//        float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
-//        if(pdf_brdf <= 0.0) break;
-
-        vec3 L = toNormalHemisphere(SampleHemisphere(), hit.normal);// 出射方向 wi
         float pdf = 1.0 / (2.0 * PI);                                   // 半球均匀采样概率密度
-        float cosine_o = max(0, dot(V, N));         // 入射光和法线夹角余弦
-        float cosine_i = max(0, dot(L, hit.normal));  // 出射光和法线夹角余弦
+        float cosine_o = max(0, dot(V, N));                             // 入射光和法线夹角余弦
+        float cosine_i = max(0, dot(L, hit.normal));                    // 出射光和法线夹角余弦
         vec3 tangent, bitangent;
         getTangent(N, tangent, bitangent);
         vec3 f_r = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material);
@@ -787,22 +781,82 @@ vec3 shading(HitRecord hit) {
 
         // 未命中
         if(!newHit.isHit) {
-//            vec3 skyColor = vec3(0);
-            vec3 skyColor = sampleHdr(randomRay.direction);
-//            Lo += history * skyColor * f_r * NdotL / pdf_brdf;
+            vec3 skyColor = vec3(0);
+            if(enableEnvMap){
+               skyColor = sampleHdr(randomRay.direction);
+            }
             Lo += history * skyColor * f_r * cosine_i / pdf;
             break;
         }
 
         // 命中光源积累颜色
         vec3 Le = newHit.material.emissive;
-//        Lo += history * Le * f_r * NdotL / pdf_brdf;
         Lo += history * Le * f_r * cosine_i / pdf;
 
         // 递归(步进)
         hit = newHit;
-//        history *= f_r * NdotL / pdf_brdf;  // 累积颜色
         history *= f_r * cosine_i / pdf;  // 累积颜色
+    }
+    return Lo;
+}
+
+// 路径追踪着色-重要性采样
+// ----------
+vec3 shadingImportanceSampling(HitRecord hit) {
+
+    vec3 Lo = vec3(0);
+    vec3 history = vec3(1);
+
+    for (int i = 0; i < maxBounce; i++) {
+
+        vec3 V = -hit.viewDir;
+        vec3 N = hit.normal;
+
+        // 获取 3 个随机数
+        vec2 uv = sobolVec2(camera.loopNum + 1, i);
+        uv = CranleyPattersonRotation(uv);
+        float xi_1 = uv.x;
+        float xi_2 = uv.y;
+        // float xi_1 = rand();
+        // float xi_2 = rand();
+        float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
+
+        // 采样 BRDF 得到一个方向 L
+        vec3 L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
+        float NdotL = dot(N, L);
+        if(NdotL <= 0.0) break;
+
+        // 获取 L 方向上的 BRDF 值和概率密度
+        vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
+        float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+        if(pdf_brdf <= 0.0) break;
+
+        // 漫反射: 随机发射光线
+        Ray randomRay;
+        randomRay.origin = hit.hitPoint;
+        randomRay.direction = L;
+        HitRecord newHit = hitBVH(randomRay);
+
+        // 反弹未命中
+        if(!newHit.isHit) {
+            vec3 skyColor = vec3(0);
+            if(enableEnvMap){
+                skyColor = sampleHdr(randomRay.direction);
+            }
+            else {
+                skyColor = getDefaultSkyColor(randomRay.direction.y);
+            }
+            Lo += history * skyColor * f_r * NdotL / pdf_brdf;
+            break;
+        }
+
+        // 命中光源积累颜色
+        vec3 Le = newHit.material.emissive;
+        Lo += history * Le * f_r * NdotL / pdf_brdf;
+
+        // 递归(步进)
+        hit = newHit;
+        history *= f_r * NdotL / pdf_brdf;  // 累积颜色
     }
     return Lo;
 }
@@ -818,22 +872,34 @@ void main() {
 //    uint(camera.loopNum) * uint(26699)) | uint(1);
 
     vec3 hist = texture(historyTexture, TexCoords).rgb;
+    if(camera.loopNum > maxIterations && maxIterations != -1) {
+        FragColor = vec4(hist, 1.0);
+        return;
+    }
 
     Ray cameraRay;
     cameraRay.origin = camera.position;
     cameraRay.direction = normalize(camera.leftBottomCorner + (TexCoords.x * 2.0 * camera.halfW) * camera.right + (TexCoords.y * 2.0 * camera.halfH) * camera.up);
     HitRecord firstHit = hitBVH(cameraRay);
 
-    vec3 curColor = vec3(0);
+    vec3 curColor = vec3(1);
 
     if(!firstHit.isHit) {
-//        curColor = vec3(0);
-//        float t = 0.5 * (cameraRay.direction.y + 1.0);
-//        curColor = (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
-        curColor = sampleHdr(cameraRay.direction);
+        if(enableEnvMap) {
+            curColor = sampleHdr(cameraRay.direction);
+        }
+        else{
+            curColor = getDefaultSkyColor(cameraRay.direction.y);
+        }
     } else {
         vec3 Le = firstHit.material.emissive;
-        vec3 Li = shading(firstHit);
+        vec3 Li = vec3(0);
+        if(enableImportantSample) {
+            Li = shadingImportanceSampling(firstHit);
+        }
+        else {
+            Li = shading(firstHit);
+        }
         curColor = Le + Li;
     }
 

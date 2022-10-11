@@ -125,6 +125,8 @@ public:
     }
 
     void Refresh() {
+        Pitch = glm::degrees(asin(Front.y));
+        Yaw = glm::degrees(acos(Front.x / cos(glm::radians(Pitch)))) - 180;
         Right = glm::normalize(glm::cross(Front, WorldUp));
         Up = glm::normalize(glm::cross(Right, Front));
         halfH = glm::tan(glm::radians(Zoom));

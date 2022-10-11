@@ -96,23 +96,29 @@ int main() {
     // glEnable(GL_DEPTH_TEST);
 
     CPURandomInit();
+
+    // render setting
     bool enableImportantSample = false;
     bool enableEnvMap = true;
+    int maxBounce = 4;
+    int maxIterations = -1;
 
     // build and compile shaders
     // -------------------------
-    Shader RayTracerShader("../../src/shaders/RayTracerVertexShader.glsl","../../src/shaders/RayTracerFragmentShader.glsl");
+    Shader RayTracerShader("../../src/shaders/RayTracerVertexShader.glsl",
+                           "../../src/shaders/RayTracerFragmentShader.glsl");
     Shader ScreenShader("../../src/shaders/ScreenVertexShader.glsl", "../../src/shaders/ScreenFragmentShader.glsl");
-    Shader ToneMappingShader("../../src/shaders/ToneMappingVertexShader.glsl", "../../src/shaders/ToneMappingFragmentShader.glsl");
+    Shader ToneMappingShader("../../src/shaders/ToneMappingVertexShader.glsl",
+                             "../../src/shaders/ToneMappingFragmentShader.glsl");
 
     // load models
     // -----------
     Model sphere("../../resources/objects/sphere.obj");
     Model quad("../../resources/objects/quad.obj");
     Model bunny("../../resources/objects/bunny_4000.obj");
-    Model plate("../../resources/objects/plate.obj");
-    Model floor("../../resources/objects/floor.obj");
-    Model teapot("../../resources/objects/teapot.obj");
+    // Model plate("../../resources/objects/plate.obj");
+    // Model floor("../../resources/objects/floor.obj");
+    // Model teapot("../../resources/objects/teapot.obj");
 
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
@@ -300,37 +306,44 @@ int main() {
         ImGui::NewFrame();
 
         glfwGetFramebufferSize(window, &width, &height);
-       // const ImGuiViewport* main_viewport = ImGui::GetMainViewport();
-       // ImGui::SetNextWindowPos(ImVec2(main_viewport->WorkPos.x + 0, main_viewport->WorkPos.y + 0));
-// #ifdef __APPLE__
-//        ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 1.5, height / 2.0));
-// #else
-//        ImGui::SetNextWindowSize(ImVec2(width / 10.0 * 3.0, height));
-// #endif
-       ImGuiWindowFlags window_flags = 0;
+        ImGuiWindowFlags window_flags = 0;
         window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
-       ImGui::Begin("Inspector", nullptr, window_flags);
-       ImGui::Text("RMB: look around");
-       ImGui::Text("MMB: zoom the view");
-       ImGui::Text("WASD: move camera");
-       ImGui::Separator();
-       ImGui::Text("Screen Buffer Size: (%d x %d)", width, height);
-       ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-       ImGui::Text("Iterations: %d", camera.LoopNum);
-       ImGui::Separator();
-       ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camera.Position.x, camera.Position.y, camera.Position.z);
-       ImGui::Text("Camera Front: (%.2f, %.2f, %.2f)", camera.Front.x, camera.Front.y, camera.Front.z);
-       ImGui::Text("Camera Up: (%.2f, %.2f, %.2f)", camera.Up.x, camera.Up.y, camera.Up.z);
-       ImGui::Text("Camera Zoom: %.2f", camera.Zoom);
-       ImGui::Separator();
-       ImGui::Checkbox("Demo Window", &show_demo_window);
-       if (show_demo_window)
-           ImGui::ShowDemoWindow(&show_demo_window);
-       ImGui::End();
+        ImGui::Begin("Inspector", nullptr, window_flags);
+        ImGui::Text("RMB: look around");
+        ImGui::Text("MMB: zoom the view");
+        ImGui::Text("WASD: move camera");
+        ImGui::Separator();
+        if (ImGui::Checkbox("Enable HDR EnvMap", &enableEnvMap)) {
+            camera.LoopNum = 0;
+        }
+        if (ImGui::Checkbox("Enable Important Sampling", &enableImportantSample)) {
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderInt("Max Bounce", &maxBounce, 1, 4)) {
+            camera.LoopNum = 0;
+        }
+        ImGui::Separator();
+        ImGui::Text("Screen Buffer Size: (%d x %d)", width, height);
+        ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+        if (ImGui::SliderInt("Max Iterations", &maxIterations, -1, 3000)) {
+            camera.LoopNum = 0;
+        }
+        ImGui::Text("Iterations: %d", camera.LoopNum);
+        ImGui::Separator();
+        ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camera.Position.x, camera.Position.y, camera.Position.z);
+        ImGui::Text("Camera Front: (%.2f, %.2f, %.2f)", camera.Front.x, camera.Front.y, camera.Front.z);
+        ImGui::Text("Camera Up: (%.2f, %.2f, %.2f)", camera.Up.x, camera.Up.y, camera.Up.z);
+        ImGui::Text("Camera Zoom: %.2f", camera.Zoom);
+        ImGui::Separator();
+        ImGui::Checkbox("Demo Window", &show_demo_window);
+        if (show_demo_window)
+            ImGui::ShowDemoWindow(&show_demo_window);
+        ImGui::End();
 
         // render
         // ------
-        camera.LoopIncrease();
+        if (maxIterations == -1 || camera.LoopNum < maxIterations) { camera.LoopIncrease(); }
+
         {
             screenBuffer.setCurrentBuffer(camera.LoopNum);
 
@@ -360,8 +373,10 @@ int main() {
             RayTracerShader.setFloat("randOrigin", 674764.0f * (GetCPURandom() + 1.0f));
             RayTracerShader.setInt("screenWidth", width);
             RayTracerShader.setInt("screenHeight", height);
-            RayTracerShader.setBool("enableImportantSample",enableImportantSample);
-            RayTracerShader.setBool("enableEnvMap",enableEnvMap);
+            RayTracerShader.setBool("enableImportantSample", enableImportantSample);
+            RayTracerShader.setBool("enableEnvMap", enableEnvMap);
+            RayTracerShader.setInt("maxBounce", maxBounce);
+            RayTracerShader.setInt("maxIterations", maxIterations);
             screen.DrawScreen();
         }
 
