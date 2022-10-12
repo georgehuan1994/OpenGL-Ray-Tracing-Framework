@@ -10,8 +10,10 @@ out vec4 FragColor;
 
 uniform int screenWidth;
 uniform int screenHeight;
+
 uniform sampler2D historyTexture;
 uniform sampler2D hdrMap;
+uniform sampler2D hdrCache;
 
 uniform samplerBuffer triangles;
 uniform int nTriangles;
@@ -237,11 +239,35 @@ vec2 SampleSphericalMap(vec3 v) {
 
 // 获取 HDR 环境颜色
 // ---------------
-vec3 sampleHdr(vec3 v) {
+vec3 SampleHdr(vec3 v) {
     vec2 uv = SampleSphericalMap(normalize(v));
     vec3 color = texture(hdrMap, uv).rgb;
-//    color = min(color, vec3(10));
     return color;
+}
+
+// 采样预计算的 HDR cache
+// --------------------
+vec3 SampleHdr(float xi_1, float xi_2) {
+    vec2 xy = texture(hdrCache, vec2(xi_1, xi_2)).rg; // x, y
+    xy.y = 1.0 - xy.y; // flip y
+
+    // 获取角度
+    float phi = 2.0 * PI * (xy.x - 0.5);    // [-pi ~ pi]
+    float theta = PI * (xy.y - 0.5);        // [-pi/2 ~ pi/2]
+
+    // 出射方向：球坐标计算方向
+    vec3 L = vec3(cos(theta) * cos(phi), sin(theta), cos(theta) * sin(phi));
+    return L;
+}
+
+// 将三维向量 v 转为 HDR map 的纹理坐标 uv
+// -----------------------------------
+vec2 toSphericalCoord(vec3 v) {
+    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+    uv /= vec2(2.0 * PI, PI);
+    uv += 0.5;
+    uv.y = 1.0 - uv.y;
+    return uv;
 }
 
 // 半球均匀采样
@@ -527,24 +553,16 @@ HitRecord hitBVH(Ray ray) {
 }
 
 vec2 CranleyPattersonRotation(vec2 p) {
-//    uint pseed = uint(
-//    uint((TexCoords.x * 0.5 + 0.5) * screenWidth)  * uint(1973) +
-//    uint((TexCoords.y * 0.5 + 0.5) * screenHeight) * uint(9277) +
-//    uint(114514/1919) * uint(26699)) | uint(1);
-//
-//    float u = randcore(pseed);
-//    float v = randcore(pseed);
-
     float u = rand();
     float v = rand();
 
     p.x += u;
-    if(p.x>1) p.x -= 1;
-    if(p.x<0) p.x += 1;
+    if(p.x > 1) p.x -= 1;
+    if(p.x < 0) p.x += 1;
 
     p.y += v;
-    if(p.y>1) p.y -= 1;
-    if(p.y<0) p.y += 1;
+    if(p.y > 1) p.y -= 1;
+    if(p.y < 0) p.y += 1;
 
     return p;
 }
@@ -732,12 +750,34 @@ float BRDF_Pdf(vec3 V, vec3 N, vec3 L, in Material material) {
     float p_clearcoat = r_clearcoat / r_sum;
 
     // 根据概率混合 pdf
-    float pdf = p_diffuse   * pdf_diffuse
+    float pdf = p_diffuse * pdf_diffuse
     + p_specular  * pdf_specular
     + p_clearcoat * pdf_clearcoat;
 
     pdf = max(1e-10, pdf);
     return pdf;
+}
+
+// 获取 HDR 环境颜色
+vec3 hdrColor(vec3 L) {
+    vec2 uv = toSphericalCoord(normalize(L));
+    vec3 color = texture2D(hdrMap, uv).rgb;
+    return color;
+}
+
+// 输入光线方向 L 获取 HDR 在该位置的概率密度
+// hdr 分辨率为 4096 x 2048 --> hdrResolution = 4096
+float hdrPdf(vec3 L, int hdrResolution) {
+    vec2 uv = toSphericalCoord(normalize(L));   // 方向向量转 uv 纹理坐标
+
+    float pdf = texture2D(hdrCache, uv).b;      // 采样概率密度
+    float theta = PI * (0.5 - uv.y);            // theta 范围 [-pi/2 ~ pi/2]
+    float sin_theta = max(sin(theta), 1e-10);
+
+    // 球坐标和图片积分域的转换系数
+    float p_convert = float(hdrResolution * hdrResolution / 2) / (2.0 * PI * PI * sin_theta);
+
+    return pdf * p_convert;
 }
 
 float misMixWeight(float a, float b) {
@@ -783,7 +823,7 @@ vec3 shading(HitRecord hit) {
         if(!newHit.isHit) {
             vec3 skyColor = vec3(0);
             if(enableEnvMap){
-               skyColor = sampleHdr(randomRay.direction);
+               skyColor = SampleHdr(randomRay.direction);
             }
             Lo += history * skyColor * f_r * cosine_i / pdf;
             break;
@@ -817,8 +857,6 @@ vec3 shadingImportanceSampling(HitRecord hit) {
         uv = CranleyPattersonRotation(uv);
         float xi_1 = uv.x;
         float xi_2 = uv.y;
-        // float xi_1 = rand();
-        // float xi_2 = rand();
         float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
 
         // 采样 BRDF 得到一个方向 L
@@ -841,7 +879,7 @@ vec3 shadingImportanceSampling(HitRecord hit) {
         if(!newHit.isHit) {
             vec3 skyColor = vec3(0);
             if(enableEnvMap){
-                skyColor = sampleHdr(randomRay.direction);
+                skyColor = SampleHdr(randomRay.direction);
             }
             else {
                 skyColor = getDefaultSkyColor(randomRay.direction.y);
@@ -866,11 +904,6 @@ void main() {
 
     wseed = uint(randOrigin * float(6.95857) * (TexCoords.x * TexCoords.y));
 
-//    wseed = uint(
-//    uint((TexCoords.x * 0.5 + 0.5) * screenWidth)  * uint(1973) +
-//    uint((TexCoords.y * 0.5 + 0.5) * screenHeight) * uint(9277) +
-//    uint(camera.loopNum) * uint(26699)) | uint(1);
-
     vec3 hist = texture(historyTexture, TexCoords).rgb;
     if(camera.loopNum > maxIterations && maxIterations != -1) {
         FragColor = vec4(hist, 1.0);
@@ -886,12 +919,13 @@ void main() {
 
     if(!firstHit.isHit) {
         if(enableEnvMap) {
-            curColor = sampleHdr(cameraRay.direction);
+            curColor = SampleHdr(cameraRay.direction);
         }
         else{
             curColor = getDefaultSkyColor(cameraRay.direction.y);
         }
-    } else {
+    }
+    else {
         vec3 Le = firstHit.material.emissive;
         vec3 Li = vec3(0);
         if(enableImportantSample) {

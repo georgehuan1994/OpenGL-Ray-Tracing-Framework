@@ -20,7 +20,7 @@ public:
     // 构造函数
     Shader(const char *vertexPath, const char *fragmentPath) {
         // 获取顶点和片段着色器
-        // ------------------------------------
+        // ----------------
         std::string vertexCode;
         std::string fragmentCode;
         std::ifstream vShaderFile;
@@ -53,7 +53,7 @@ public:
         const char *fShaderCode = fragmentCode.c_str();
 
         // 编译着色器
-        // ------------------------------------
+        // --------
         unsigned int vertex, fragment;
         int success;
         char infoLog[512];

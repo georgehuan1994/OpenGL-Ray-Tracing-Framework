@@ -41,6 +41,7 @@ include_directories(src/core/
 file(GLOB PROJECT_CORE src/core/*.h)
 file(GLOB VENDORS_SOURCES
 		thirdparty/glad/src/glad.c
+		thirdparty/stb/*.h
 		thirdparty/imgui/*.h
 		thirdparty/imgui/*.cpp
 		thirdparty/imgui/backends/imgui_impl_glfw.h

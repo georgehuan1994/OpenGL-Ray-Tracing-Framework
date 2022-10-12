@@ -6,9 +6,10 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
-#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+#include "stb_image_write.h"
+#include "stb_image_resize.h"
 
-#include <stb_image.h>
 #include <assimp/Importer.hpp>
 #include <assimp/scene.h>
 #include <assimp/postprocess.h>
@@ -26,6 +27,17 @@
 using namespace std;
 
 unsigned int TextureFromFile(const char *path, const string &directory, bool gamma = false, bool isHDR = false);
+
+// void SaveFrame(const std::string filename, int width, int height) {
+//     unsigned char *data = nullptr;
+//
+//     glGetTexImage(GL_TEXTURE_2D, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
+//
+//     stbi_flip_vertically_on_write(true);
+//     stbi_write_png(filename.c_str(), width, height, 4, data, width * 4);
+//     printf("Frame saved: %s\n", filename.c_str());
+//     delete[] data;
+// }
 
 class Model {
 public:

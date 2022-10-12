@@ -1,3 +1,5 @@
+#define STB_IMAGE_IMPLEMENTATION
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -9,15 +11,13 @@
 #include "imgui_impl_glfw.h"
 #include "imgui_impl_opengl3.h"
 
-#include "AppGUI.h"
-
 #include "Camera.h"
 #include "Shader.h"
 #include "Model.h"
 #include "Screen.h"
-#include "Utility.h"
 #include "Triangle.h"
 #include "BVH.h"
+#include "Utility.h"
 
 #include "hdrloader.h"
 
@@ -33,34 +33,38 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 
 void processInput(GLFWwindow *window);
 
-// settings
+
+
+// Settings
 const unsigned int SCR_WIDTH = 512;
 const unsigned int SCR_HEIGHT = 512;
-
 #define RENDER_SCALE 1
+#define MAX_BOUNCE 4
 
-// camera
+// Camera
 Camera camera((float) SCR_WIDTH / (float) SCR_HEIGHT, glm::vec3(0.0f, 0.0f, 7.0f));
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
 
-// timer
+// Timer
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 float fps = 0.0f;
 
-// screen FBO
+// Screen FBO
 RenderBuffer screenBuffer;
 
-// triangle data
+// Triangle Texture Buffer Data
 GLuint trianglesTextureBuffer;
 
-// bvh node data
+// BVH Node Texture Buffer Data
 GLuint nodesTextureBuffer;
 
-// hdr map data
+// HDR Map Data
 GLuint hdrMap;
+GLuint hdrCache;
+int hdrResolution;
 
 int main() {
 
@@ -91,27 +95,22 @@ int main() {
         return -1;
     }
 
-    // stbi_set_flip_vertically_on_load(true);
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+    glViewport(0, 0, width * RENDER_SCALE, height * RENDER_SCALE);
 
-    // glEnable(GL_DEPTH_TEST);
+    // stbi_set_flip_vertically_on_load(true);
 
     CPURandomInit();
 
-    // render setting
-    bool enableImportantSample = false;
-    bool enableEnvMap = true;
-    int maxBounce = 4;
-    int maxIterations = -1;
-
-    // build and compile shaders
+    // Build and Compile Shaders
     // -------------------------
-    Shader RayTracerShader("../../src/shaders/RayTracerVertexShader.glsl",
-                           "../../src/shaders/RayTracerFragmentShader.glsl");
-    Shader ScreenShader("../../src/shaders/ScreenVertexShader.glsl", "../../src/shaders/ScreenFragmentShader.glsl");
-    Shader ToneMappingShader("../../src/shaders/ToneMappingVertexShader.glsl",
-                             "../../src/shaders/ToneMappingFragmentShader.glsl");
+    const char *vertexShaderPath = "../../src/shaders/vertex_shader.glsl";
+    Shader RayTracerShader(vertexShaderPath,"../../src/shaders/fragment_shader_ray_tracing.glsl");
+    Shader ScreenShader(vertexShaderPath, "../../src/shaders/fragment_shader_screen.glsl");
+    Shader ToneMappingShader(vertexShaderPath,"../../src/shaders/fragment_shader_tone_mapping.glsl");
 
-    // load models
+    // Load Models
     // -----------
     Model sphere("../../resources/objects/sphere.obj");
     Model quad("../../resources/objects/quad.obj");
@@ -119,10 +118,6 @@ int main() {
     // Model plate("../../resources/objects/plate.obj");
     // Model floor("../../resources/objects/floor.obj");
     // Model teapot("../../resources/objects/teapot.obj");
-
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    glViewport(0, 0, width * RENDER_SCALE, height * RENDER_SCALE);
 
     Screen screen;
     screen.InitScreenBind();
@@ -133,7 +128,7 @@ int main() {
     std::vector<Triangle> triangles;
 
 
-#pragma region cornell box
+#pragma region Scene
     Material cornell_box_white;
     Material cornell_box_red;
     Material cornell_box_green;
@@ -201,7 +196,8 @@ int main() {
     int nTriangles = triangles.size();
     std::cout << "Scene loading completed: " << nTriangles << " triangle faces in total" << std::endl;
 
-    // build bvh node
+    // Build BVH Node Data
+    // -------------------
     BVHNode testNode;
     testNode.left = 255;
     testNode.right = 128;
@@ -214,21 +210,22 @@ int main() {
     int nNodes = nodes.size();
     std::cout << "BVH building completed: " << nNodes << " nodes in total" << std::endl;
 
-    // 编码三角形数据
+    // Encode Triangle Data
+    // --------------------
     std::vector<Triangle_encoded> triangles_encoded(nTriangles);
     RayTracerShader.setInt("nTriangles", nTriangles);
     for (int i = 0; i < nTriangles; i++) {
         Triangle &t = triangles[i];
         Material &m = t.material;
-        // 顶点位置
+        // vertex position
         triangles_encoded[i].p1 = t.p1;
         triangles_encoded[i].p2 = t.p2;
         triangles_encoded[i].p3 = t.p3;
-        // 顶点法线
+        // vertex normal
         triangles_encoded[i].n1 = t.n1;
         triangles_encoded[i].n2 = t.n2;
         triangles_encoded[i].n3 = t.n3;
-        // 材质
+        // material
         triangles_encoded[i].emissive = m.emissive;
         triangles_encoded[i].baseColor = m.baseColor;
         triangles_encoded[i].param1 = vec3(m.subsurface, m.metallic, m.specular);
@@ -237,7 +234,8 @@ int main() {
         triangles_encoded[i].param4 = vec3(m.clearcoatGloss, m.IOR, m.transmission);
     }
 
-    // 编码 BVHNode, aabb
+    // Encode BVHNode and AABB
+    // -----------------------
     std::vector<BVHNode_encoded> nodes_encoded(nNodes);
     RayTracerShader.setInt("nNodes", nodes.size());
     for (int i = 0; i < nNodes; i++) {
@@ -247,7 +245,8 @@ int main() {
         nodes_encoded[i].BB = nodes[i].BB;
     }
 
-    // 三角形数组
+    // Triangle Texture Buffer
+    // -----------------------
     GLuint tbo0;
     glGenBuffers(1, &tbo0);
     glBindBuffer(GL_TEXTURE_BUFFER, tbo0);
@@ -257,7 +256,8 @@ int main() {
     glBindTexture(GL_TEXTURE_BUFFER, trianglesTextureBuffer);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo0);
 
-    // BVHNode 数组
+    // BVHNode Texture Buffer
+    // -----------------------
     GLuint tbo1;
     glGenBuffers(1, &tbo1);
     glBindBuffer(GL_TEXTURE_BUFFER, tbo1);
@@ -266,33 +266,50 @@ int main() {
     glBindTexture(GL_TEXTURE_BUFFER, nodesTextureBuffer);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo1);
 
-    // HDR 全景图
+    // HDR Environment Map
+    // -------------------
     HDRLoaderResult hdrRes;
     bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_4k.hdr", hdrRes);
     hdrMap = getTextureRGB32F(hdrRes.width, hdrRes.height);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, hdrRes.cols);
 
-    // 线框模式
-    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    // HDR Important Sampling Cache
+    // ----------------------------
+    std::cout << "HDR Map Important Sample Cache, HDR Resolution: " << hdrRes.width << " " << hdrRes.height << std::endl;
+    float* cache = calculateHdrCache(hdrRes.cols, hdrRes.width, hdrRes.height);
+    hdrCache = getTextureRGB32F(hdrRes.width, hdrRes.height);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, cache);
+    hdrResolution = hdrRes.width;
 
-    // Setup Dear ImGui context
+    // Setup Dear ImGui Context
+    // ------------------------
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
     ImGuiIO &io = ImGui::GetIO();
     (void) io;
 
     // Setup Dear ImGui style
+    // ----------------------
     ImGui::StyleColorsClassic();
-
-    // Setup Platform/Renderer backends
     ImGui_ImplGlfw_InitForOpenGL(window, true);
     ImGui_ImplOpenGL3_Init(glsl_version);
 
     camera.Refresh();
 
+    // glEnable(GL_DEPTH_TEST);
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    // 渲染循环
-    // -------
+    // Render Setting
+    bool show_demo_window = false;
+    bool enableImportantSample = false;
+    bool enableEnvMap = true;
+    bool enableToneMapping = true;
+    bool enableGammaCorrection = true;
+    int maxBounce = 4;
+    int maxIterations = -1;
+
+    // Render Loop
+    // -----------
     while (!glfwWindowShouldClose(window)) {
         auto currentFrame = static_cast<float>(glfwGetTime());
         deltaTime = currentFrame - lastFrame;
@@ -310,7 +327,7 @@ int main() {
         window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
         ImGui::Begin("Inspector", nullptr, window_flags);
         ImGui::Text("RMB: look around");
-        ImGui::Text("MMB: zoom the view");
+        ImGui::Text("MMS: zoom the view");
         ImGui::Text("WASD: move camera");
         ImGui::Separator();
         if (ImGui::Checkbox("Enable HDR EnvMap", &enableEnvMap)) {
@@ -319,7 +336,7 @@ int main() {
         if (ImGui::Checkbox("Enable Important Sampling", &enableImportantSample)) {
             camera.LoopNum = 0;
         }
-        if (ImGui::SliderInt("Max Bounce", &maxBounce, 1, 4)) {
+        if (ImGui::SliderInt("Max Bounce", &maxBounce, 1, MAX_BOUNCE)) {
             camera.LoopNum = 0;
         }
         ImGui::Separator();
@@ -335,13 +352,17 @@ int main() {
         ImGui::Text("Camera Up: (%.2f, %.2f, %.2f)", camera.Up.x, camera.Up.y, camera.Up.z);
         ImGui::Text("Camera Zoom: %.2f", camera.Zoom);
         ImGui::Separator();
+        ImGui::Checkbox("Enable ToneMapping", &enableToneMapping);
+        ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
+        ImGui::Separator();
         ImGui::Checkbox("Demo Window", &show_demo_window);
         if (show_demo_window)
             ImGui::ShowDemoWindow(&show_demo_window);
+        if (ImGui::Button("Save Frame")) {
+            // SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + ".png", width, height);
+        }
         ImGui::End();
 
-        // render
-        // ------
         if (maxIterations == -1 || camera.LoopNum < maxIterations) { camera.LoopIncrease(); }
 
         {
@@ -360,6 +381,10 @@ int main() {
             glActiveTexture(GL_TEXTURE0 + 3);
             glBindTexture(GL_TEXTURE_2D, hdrMap);
             RayTracerShader.setInt("hdrMap", 3);
+
+            glActiveTexture(GL_TEXTURE0 + 4);
+            glBindTexture(GL_TEXTURE_2D, hdrCache);
+            RayTracerShader.setInt("hdrCache", 4);
 
             RayTracerShader.use();
             RayTracerShader.setVec3("camera.position", camera.Position);
@@ -391,35 +416,19 @@ int main() {
             screen.DrawScreen();
         }
 
+        if (enableToneMapping)
         {
-            // glBindFramebuffer(GL_FRAMEBUFFER, 0);
-            // glClearColor(0, 0, 0, 1.0f);
-            // glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            //
-            // ToneMappingShader.use();
-            // screenBuffer.setCurrentAsTexture(camera.LoopNum);
-            // ToneMappingShader.setInt("texPass0", 0);
-            // screen.DrawScreen();
-        }
+            glBindFramebuffer(GL_FRAMEBUFFER, 0);
+            glClearColor(0, 0, 0, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // // view/projection transformations
-        // glm::mat4 projection = glm::perspective(glm::radians(camera.Zoom), (float) WINDOW_WIDTH / (float) WINDOW_HEIGHT, 0.1f,
-        //                                         100.0f);
-        // glm::mat4 view = camera.GetViewMatrix();
-        // ourShader.setMat4("projection", projection);
-        // ourShader.setMat4("view", view);
-        // float customColor = 0.5f;
-        // ourShader.setFloat("customColor", customColor);
-        //
-        // // render the loaded model
-        // glm::mat4 model = glm::mat4(1.0f);
-        // model = glm::translate(model,
-        //                        glm::vec3(0.0f, 0.0f, 0.0f)); // translate it down so it's at the center of the scene
-        // model = glm::scale(model, glm::vec3(1.0f, 1.0f, 1.0f));    // it's a bit too big for our scene, so scale it down
-        // ourShader.setMat4("model", model);
-        // ourModel.Draw(ourShader);
-        //
-        // screen.DrawScreen();
+            ToneMappingShader.use();
+            screenBuffer.setCurrentAsTexture(camera.LoopNum);
+            ToneMappingShader.setBool("enableToneMapping", enableToneMapping);
+            ToneMappingShader.setBool("enableGammaCorrection", enableGammaCorrection);
+            ToneMappingShader.setInt("texPass0", 0);
+            screen.DrawScreen();
+        }
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
