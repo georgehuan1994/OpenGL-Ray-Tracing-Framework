@@ -129,8 +129,6 @@ int main() {
 
 #pragma region Scene
 
-    camera.Zoom = 25.0f;
-
     Material white;
     white.baseColor = vec3(0.73, 0.73, 0.73);
     white.roughness = 0.5;
@@ -159,7 +157,7 @@ int main() {
 
     Model dragon("../../resources/objects/dragon.obj");
     getTriangle(dragon.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0), vec3(1.7, -2.2, 3), vec3(3.5)), true);
+                getTransformMatrix(vec3(0), vec3(2, -2.2, 3), vec3(3.5)), true);
 
 #pragma endregion
 
@@ -275,7 +273,7 @@ int main() {
     bool enableToneMapping = true;
     bool enableGammaCorrection = true;
     int maxBounce = 4;
-    int maxIterations = 512;
+    int maxIterations = 1000;
     for (int i = 0; i < 3; ++i) {
         cameraPosition[i] = camera.Position[i];
         cameraRotation[i] = camera.Rotation[i];
