@@ -16,6 +16,19 @@ float GetCPURandom() {
     return (float) rand() / (RAND_MAX + 1.0);
 }
 
+void SaveFrame(const std::string filename, int width, int height) {
+    GLsizei nrChannels = 3;
+    GLsizei stride = nrChannels * width;
+    stride += (stride % 4) ? (4 - stride % 4) : 0;
+    GLsizei bufferSize = stride * height;
+    std::vector<char> buffer(bufferSize);
+    glPixelStorei(GL_PACK_ALIGNMENT, 4);
+    glReadBuffer(GL_FRONT);
+    glReadPixels(0, 0, width, height, GL_RGB, GL_UNSIGNED_BYTE, buffer.data());
+    stbi_flip_vertically_on_write(true);
+    stbi_write_png(filename.c_str(), width, height, nrChannels, buffer.data(), stride);
+}
+
 // 计算 HDR 贴图相关缓存信息
 float *calculateHdrCache(float *HDR, int width, int height) {
 

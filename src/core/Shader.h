@@ -62,7 +62,7 @@ public:
         vertex = glCreateShader(GL_VERTEX_SHADER);
         glShaderSource(vertex, 1, &vShaderCode, nullptr);
         glCompileShader(vertex);
-        std::cout << "Compiling vertex shader..." << std::endl;
+        std::cout << "Compiling vertex shader: " << vertexPath << std::endl;
 
         glGetShaderiv(vertex, GL_COMPILE_STATUS, &success);
         if (!success) {
@@ -74,7 +74,7 @@ public:
         fragment = glCreateShader(GL_FRAGMENT_SHADER);
         glShaderSource(fragment, 1, &fShaderCode, nullptr);
         glCompileShader(fragment);
-        std::cout << "Compiling fragment shader..." << std::endl;
+        std::cout << "Compiling fragment shader: " << fragmentPath << std::endl;
 
         glGetShaderiv(fragment, GL_COMPILE_STATUS, &success);
         if (!success) {

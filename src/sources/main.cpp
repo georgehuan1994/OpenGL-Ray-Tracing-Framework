@@ -1,11 +1,15 @@
-#define STB_IMAGE_IMPLEMENTATION
-
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include "stb_image.h"
+#include "stb_image_write.h"
+#include "stb_image_resize.h"
 
 #include "imgui.h"
 #include "imgui_impl_glfw.h"
@@ -33,16 +37,17 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 
 void processInput(GLFWwindow *window);
 
-
-
 // Settings
-const unsigned int SCR_WIDTH = 512;
+const unsigned int SCR_WIDTH = 1024;
 const unsigned int SCR_HEIGHT = 512;
 #define RENDER_SCALE 1
 #define MAX_BOUNCE 4
 
 // Camera
-Camera camera((float) SCR_WIDTH / (float) SCR_HEIGHT, glm::vec3(0.0f, 0.0f, 7.0f));
+Camera camera((float) SCR_WIDTH / (float) SCR_HEIGHT,
+              glm::vec3(0.0f, 0.0f, 7.0f),
+              glm::vec3(-90.0f, -13.3f, 0.0f));
+
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
 bool firstMouse = true;
@@ -78,8 +83,8 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Ray Tracing Framework", NULL, NULL);
-    if (window == NULL) {
+    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Ray Tracing Framework", nullptr, nullptr);
+    if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
         return -1;
@@ -129,36 +134,9 @@ int main() {
 
 
 #pragma region Scene
-    Material cornell_box_white;
-    Material cornell_box_red;
-    Material cornell_box_green;
-    Material cornell_box_light;
 
-    cornell_box_white.baseColor = vec3(0.73, 0.73, 0.73);
-    cornell_box_red.baseColor = vec3(0.65, 0.05, 0.05);
-    cornell_box_green.baseColor = vec3(0.12, 0.45, 0.15);
-    cornell_box_light.baseColor = vec3(1, 1, 1);
-    cornell_box_light.emissive = vec3(15, 15, 15);
-
-//   getTriangle(quad.meshes, triangles, cornell_box_white,
-//               getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-//   getTriangle(quad.meshes, triangles, cornell_box_white,
-//               getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5.5), vec3(11.1, 0.1, 11.1)), false);
-//   getTriangle(quad.meshes, triangles, cornell_box_white,
-//               getTransformMatrix(vec3(0, 0, 0), vec3(0, 0, -11), vec3(11.1, 11.1, 0.2)), false);
-//   getTriangle(quad.meshes, triangles, cornell_box_green,
-//               getTransformMatrix(vec3(0, 0, 0), vec3(-5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-//   getTriangle(quad.meshes, triangles, cornell_box_red,
-//               getTransformMatrix(vec3(0, 0, 0), vec3(5.5, 0, -5.5), vec3(0.1, 11.1, 11.1)), false);
-//   getTriangle(quad.meshes, triangles, cornell_box_light,
-//               getTransformMatrix(vec3(0, 0, 0), vec3(0, 5.49, -5.5), vec3(2.6, 0.1, 2.1)), false);
-//   getTriangle(quad.meshes, triangles, cornell_box_white,
-//               getTransformMatrix(vec3(0, 15, 0), vec3(-1.65, -2.2, -7.5), vec3(3.2, 6.6, 3.2)), false);
-//   getTriangle(sphere.meshes, triangles, cornell_box_white,
-//               getTransformMatrix(vec3(0, 0, 0), vec3(1.65, -3.9, -5), vec3(3.2, 3.2, 3.2)), false);
-
-    camera.Front = vec3(0, -0.23, -0.97);
-    camera.Up = vec3(0, 0.97, -0.23);
+    // camera.Front = vec3(0, -0.23, -0.97);
+    // camera.Up = vec3(0, 0.97, -0.23);
     camera.Zoom = 25.0f;
 
     Material white;
@@ -178,12 +156,13 @@ int main() {
     golden.metallic = 1.0;
     golden.clearcoat = 1.0;
 
-    // bunny
+    // teapot
     // getTriangle(teapot.meshes, triangles, white,
     //             getTransformMatrix(vec3(0, 90, 0), vec3(0, -5.2, -5), vec3(2, 2, 2)), false);
 
+    // bunny
     getTriangle(bunny.meshes, triangles, jade,
-                getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.2, -5), vec3(2, 2, 2)), false);
+                getTransformMatrix(vec3(0, 0, 0), vec3(2, -2.5, 3), vec3(2, 2, 2)), false);
 
     // getTriangle(plate.meshes, triangles, white,
     //             getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(20, 10, 5)), false);
@@ -213,7 +192,6 @@ int main() {
     // Encode Triangle Data
     // --------------------
     std::vector<Triangle_encoded> triangles_encoded(nTriangles);
-    RayTracerShader.setInt("nTriangles", nTriangles);
     for (int i = 0; i < nTriangles; i++) {
         Triangle &t = triangles[i];
         Material &m = t.material;
@@ -233,17 +211,18 @@ int main() {
         triangles_encoded[i].param3 = vec3(m.sheen, m.sheenTint, m.clearcoat);
         triangles_encoded[i].param4 = vec3(m.clearcoatGloss, m.IOR, m.transmission);
     }
+    RayTracerShader.setInt("nTriangles", nTriangles);
 
     // Encode BVHNode and AABB
     // -----------------------
     std::vector<BVHNode_encoded> nodes_encoded(nNodes);
-    RayTracerShader.setInt("nNodes", nodes.size());
     for (int i = 0; i < nNodes; i++) {
         nodes_encoded[i].childs = vec3(nodes[i].left, nodes[i].right, 0);
         nodes_encoded[i].leafInfo = vec3(nodes[i].n, nodes[i].index, 0);
         nodes_encoded[i].AA = nodes[i].AA;
         nodes_encoded[i].BB = nodes[i].BB;
     }
+    RayTracerShader.setInt("nNodes", nodes.size());
 
     // Triangle Texture Buffer
     // -----------------------
@@ -275,7 +254,7 @@ int main() {
 
     // HDR Important Sampling Cache
     // ----------------------------
-    std::cout << "HDR Map Important Sample Cache, HDR Resolution: " << hdrRes.width << " " << hdrRes.height << std::endl;
+    std::cout << "HDR Map Important Sample Cache, HDR Resolution: " << hdrRes.width << " x " << hdrRes.height << std::endl;
     float* cache = calculateHdrCache(hdrRes.cols, hdrRes.width, hdrRes.height);
     hdrCache = getTextureRGB32F(hdrRes.width, hdrRes.height);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, cache);
@@ -301,7 +280,7 @@ int main() {
 
     // Render Setting
     bool show_demo_window = false;
-    bool enableImportantSample = false;
+    bool enableImportantSample = true;
     bool enableEnvMap = true;
     bool enableToneMapping = true;
     bool enableGammaCorrection = true;
@@ -348,6 +327,7 @@ int main() {
         ImGui::Text("Iterations: %d", camera.LoopNum);
         ImGui::Separator();
         ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camera.Position.x, camera.Position.y, camera.Position.z);
+        ImGui::Text("Camera Rotation: (%.2f, %.2f, %.2f)", camera.Rotation.x, camera.Rotation.y, camera.Rotation.z);
         ImGui::Text("Camera Front: (%.2f, %.2f, %.2f)", camera.Front.x, camera.Front.y, camera.Front.z);
         ImGui::Text("Camera Up: (%.2f, %.2f, %.2f)", camera.Up.x, camera.Up.y, camera.Up.z);
         ImGui::Text("Camera Zoom: %.2f", camera.Zoom);
@@ -355,11 +335,11 @@ int main() {
         ImGui::Checkbox("Enable ToneMapping", &enableToneMapping);
         ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
         ImGui::Separator();
-        ImGui::Checkbox("Demo Window", &show_demo_window);
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
+        // ImGui::Checkbox("Demo Window", &show_demo_window);
+        // if (show_demo_window)
+        //     ImGui::ShowDemoWindow(&show_demo_window);
         if (ImGui::Button("Save Frame")) {
-            // SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + ".png", width, height);
+            SaveFrame("../../screenshot/screenshot_bunny_" + to_string(camera.LoopNum) + "_spp.png", width, height);
         }
         ImGui::End();
 
@@ -368,6 +348,7 @@ int main() {
         {
             screenBuffer.setCurrentBuffer(camera.LoopNum);
 
+            RayTracerShader.setInt("hdrResolution", hdrResolution);
             RayTracerShader.setInt("historyTexture", 0);
 
             glActiveTexture(GL_TEXTURE0 + 1);

@@ -10,11 +10,11 @@ out vec4 FragColor;
 
 uniform int screenWidth;
 uniform int screenHeight;
+uniform int hdrResolution;
 
 uniform sampler2D historyTexture;
 uniform sampler2D hdrMap;
 uniform sampler2D hdrCache;
-
 uniform samplerBuffer triangles;
 uniform int nTriangles;
 
@@ -761,7 +761,7 @@ float BRDF_Pdf(vec3 V, vec3 N, vec3 L, in Material material) {
 // 获取 HDR 环境颜色
 vec3 hdrColor(vec3 L) {
     vec2 uv = toSphericalCoord(normalize(L));
-    vec3 color = texture2D(hdrMap, uv).rgb;
+    vec3 color = texture(hdrMap, uv).rgb;
     return color;
 }
 
@@ -770,7 +770,7 @@ vec3 hdrColor(vec3 L) {
 float hdrPdf(vec3 L, int hdrResolution) {
     vec2 uv = toSphericalCoord(normalize(L));   // 方向向量转 uv 纹理坐标
 
-    float pdf = texture2D(hdrCache, uv).b;      // 采样概率密度
+    float pdf = texture(hdrCache, uv).b;      // 采样概率密度
     float theta = PI * (0.5 - uv.y);            // theta 范围 [-pi/2 ~ pi/2]
     float sin_theta = max(sin(theta), 1e-10);
 
@@ -852,6 +852,31 @@ vec3 shadingImportanceSampling(HitRecord hit) {
         vec3 V = -hit.viewDir;
         vec3 N = hit.normal;
 
+        // HDR 环境贴图重要性采样
+        Ray hdrTestRay;
+        hdrTestRay.origin = hit.hitPoint;
+        hdrTestRay.direction = SampleHdr(rand(), rand());
+
+        // 进行一次求交测试 判断是否有遮挡
+        if(dot(N, hdrTestRay.direction) > 0.0) { // 如果采样方向背向点 p 则放弃测试, 因为 N dot L < 0
+            HitRecord hdrHit = hitBVH(hdrTestRay);
+
+            // 天空光仅在没有遮挡的情况下积累亮度
+            if(!hdrHit.isHit) {
+                // 获取采样方向 L 上的: 1.光照贡献, 2.环境贴图在该位置的 pdf, 3.BRDF 函数值, 4.BRDF 在该方向的 pdf
+                vec3 L = hdrTestRay.direction;
+                vec3 skyColor = hdrColor(L);
+                float pdf_light = hdrPdf(L, hdrResolution);
+                vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
+                float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+
+                // 多重重要性采样
+//                float mis_weight = misMixWeight(pdf_light, pdf_brdf);
+//                Lo += mis_weight * history * skyColor * f_r * dot(N, L) / pdf_light;
+                 Lo += history * skyColor * f_r * dot(N, L) / pdf_light;   // 常规
+            }
+        }
+
         // 获取 3 个随机数
         vec2 uv = sobolVec2(camera.loopNum + 1, i);
         uv = CranleyPattersonRotation(uv);
@@ -879,7 +904,15 @@ vec3 shadingImportanceSampling(HitRecord hit) {
         if(!newHit.isHit) {
             vec3 skyColor = vec3(0);
             if(enableEnvMap){
-                skyColor = SampleHdr(randomRay.direction);
+//                skyColor = SampleHdr(randomRay.direction);
+                skyColor = hdrColor(L);
+                float pdf_light = hdrPdf(L, hdrResolution);
+
+                // 多重重要性采样
+//                float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
+//                Lo += mis_weight * history * color * f_r * NdotL / pdf_brdf;
+                Lo += history * skyColor * f_r * NdotL / pdf_brdf;   // 常规
+                break;
             }
             else {
                 skyColor = getDefaultSkyColor(randomRay.direction.y);

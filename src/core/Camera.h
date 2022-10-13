@@ -23,7 +23,9 @@ const float FOV = 30.0f;
 
 class Camera {
 public:
+    glm::mat4 ViewMatrix;
     glm::vec3 Position;
+    glm::vec3 Rotation;
     glm::vec3 Front;
     glm::vec3 Up;
     glm::vec3 Right;
@@ -46,18 +48,28 @@ public:
 
     Camera(float screenRatio = 1.0f,
            glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f),
+           glm::vec3 rotation = glm::vec3(YAW, PITCH, 0.0f),
            glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
            float yaw = YAW,
            float pitch = PITCH) :
+            ViewMatrix(glm::mat4(1)),
             Front(glm::vec3(0.0f, 0.0f, -1.0f)),
             MovementSpeed(SPEED),
             MouseSensitivity(SENSITIVITY),
             Zoom(ZOOM) {
 
         Position = position;
+        Rotation = rotation;
+        glm::mat4 rotationMat(1);
+        rotationMat = glm::rotate(rotationMat, Rotation.x, glm::vec3(1.0, 0.0, 0.0));
+        rotationMat = glm::rotate(rotationMat, Rotation.y, glm::vec3(0.0, 1.0, 0.0));
+        Front = glm::vec3(rotationMat * glm::vec4(Front, 1.0));
+        Up = glm::vec3(rotationMat * glm::vec4(Up, 1.0));
+        Right = glm::vec3(rotationMat * glm::vec4(Right, 1.0));
+
         WorldUp = up;
-        Yaw = yaw;
-        Pitch = pitch;
+        Yaw = Rotation.x;
+        Pitch = Rotation.y;
         ScreenRatio = screenRatio;
         Fov = FOV;
         halfH = glm::tan(glm::radians(Zoom));
@@ -99,6 +111,7 @@ public:
                 Pitch = 89.0f;
         }
 
+        Rotation = glm::vec3(Yaw, Pitch, 0.0f);
         updateCameraVectors();
     }
 
@@ -116,7 +129,7 @@ public:
     }
 
     void ProcessScreenRatio(int screenWidth, int screenHeight) {
-        ScreenRatio = (float)screenWidth / (float)screenHeight;
+        ScreenRatio = (float) screenWidth / (float) screenHeight;
         updateCameraVectors();
     }
 
@@ -132,6 +145,7 @@ public:
         halfH = glm::tan(glm::radians(Zoom));
         halfW = halfH * ScreenRatio;
         LeftBottomCorner = Front - halfW * Right - halfH * Up;
+        Rotation = glm::vec3(Yaw, Pitch, 0.0f);
         LoopNum = 0;
     }
 
