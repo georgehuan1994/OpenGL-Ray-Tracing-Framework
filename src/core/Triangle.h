@@ -110,4 +110,44 @@ void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Mate
     }
 }
 
+void RefreshTriangleMaterial(vector<Triangle> &triangles, vector<Triangle_encoded> &triangles_encoded, Material m, GLuint tbo, GLuint textureBuffer) {
+    int n = triangles.size();
+    for (int i = 0; i < n; ++i) {
+        Triangle &t = triangles[i];
+        t.material = m;
+        triangles_encoded[i].emissive = m.emissive;
+        triangles_encoded[i].baseColor = m.baseColor;
+        triangles_encoded[i].param1 = vec3(m.subsurface, m.metallic, m.specular);
+        triangles_encoded[i].param2 = vec3(m.specularTint, m.roughness, m.anisotropic);
+        triangles_encoded[i].param3 = vec3(m.sheen, m.sheenTint, m.clearcoat);
+        triangles_encoded[i].param4 = vec3(m.clearcoatGloss, m.IOR, m.transmission);
+    }
+    glBindBuffer(GL_TEXTURE_BUFFER, tbo);
+    glBufferData(GL_TEXTURE_BUFFER, triangles_encoded.size() * sizeof(Triangle_encoded), &triangles_encoded[0], GL_STATIC_DRAW);
+    glBindTexture(GL_TEXTURE_BUFFER, textureBuffer);
+    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo);
+}
+
+void EncodeTriangle(vector<Triangle> &triangles, vector<Triangle_encoded> &triangles_encoded, int nTriangles) {
+    for (int i = 0; i < nTriangles; i++) {
+        Triangle &t = triangles[i];
+        Material &m = t.material;
+        // vertex position
+        triangles_encoded[i].p1 = t.p1;
+        triangles_encoded[i].p2 = t.p2;
+        triangles_encoded[i].p3 = t.p3;
+        // vertex normal
+        triangles_encoded[i].n1 = t.n1;
+        triangles_encoded[i].n2 = t.n2;
+        triangles_encoded[i].n3 = t.n3;
+        // material
+        triangles_encoded[i].emissive = m.emissive;
+        triangles_encoded[i].baseColor = m.baseColor;
+        triangles_encoded[i].param1 = vec3(m.subsurface, m.metallic, m.specular);
+        triangles_encoded[i].param2 = vec3(m.specularTint, m.roughness, m.anisotropic);
+        triangles_encoded[i].param3 = vec3(m.sheen, m.sheenTint, m.clearcoat);
+        triangles_encoded[i].param4 = vec3(m.clearcoatGloss, m.IOR, m.transmission);
+    }
+}
+
 #endif //TRIANGLE_H

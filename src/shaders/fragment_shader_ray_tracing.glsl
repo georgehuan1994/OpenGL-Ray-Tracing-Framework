@@ -938,39 +938,39 @@ void main() {
     wseed = uint(randOrigin * float(6.95857) * (TexCoords.x * TexCoords.y));
 
     vec3 hist = texture(historyTexture, TexCoords).rgb;
-    if(camera.loopNum > maxIterations && maxIterations != -1) {
-        FragColor = vec4(hist, 1.0);
-        return;
-    }
 
-    Ray cameraRay;
-    cameraRay.origin = camera.position;
-    cameraRay.direction = normalize(camera.leftBottomCorner + (TexCoords.x * 2.0 * camera.halfW) * camera.right + (TexCoords.y * 2.0 * camera.halfH) * camera.up);
-    HitRecord firstHit = hitBVH(cameraRay);
+    if (maxIterations == -1 || camera.loopNum < maxIterations) {
+        Ray cameraRay;
+        cameraRay.origin = camera.position;
+        cameraRay.direction = normalize(camera.leftBottomCorner + (TexCoords.x * 2.0 * camera.halfW) * camera.right + (TexCoords.y * 2.0 * camera.halfH) * camera.up);
+        HitRecord firstHit = hitBVH(cameraRay);
 
-    vec3 curColor = vec3(1);
+        vec3 curColor = vec3(1);
 
-    if(!firstHit.isHit) {
-        if(enableEnvMap) {
-            curColor = SampleHdr(cameraRay.direction);
-        }
-        else{
-            curColor = getDefaultSkyColor(cameraRay.direction.y);
-        }
-    }
-    else {
-        vec3 Le = firstHit.material.emissive;
-        vec3 Li = vec3(0);
-        if(enableImportantSample) {
-            Li = shadingImportanceSampling(firstHit);
+        if(!firstHit.isHit) {
+            if(enableEnvMap) {
+                curColor = SampleHdr(cameraRay.direction);
+            }
+            else{
+                curColor = getDefaultSkyColor(cameraRay.direction.y);
+            }
         }
         else {
-            Li = shading(firstHit);
+            vec3 Le = firstHit.material.emissive;
+            vec3 Li = vec3(0);
+            if(enableImportantSample) {
+                Li = shadingImportanceSampling(firstHit);
+            }
+            else {
+                Li = shading(firstHit);
+            }
+            curColor = Le + Li;
         }
-        curColor = Le + Li;
+
+        curColor = (1.0 / float(camera.loopNum)) * curColor + (float(camera.loopNum - 1) / float(camera.loopNum)) * hist;
+        FragColor = vec4(curColor, 1.0);
     }
-
-    curColor = (1.0 / float(camera.loopNum)) * curColor + (float(camera.loopNum - 1) / float(camera.loopNum)) * hist;
-    FragColor = vec4(curColor, 1.0);
-
+    else {
+        FragColor = vec4(hist, 1.0);
+    }
 }

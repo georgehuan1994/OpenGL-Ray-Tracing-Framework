@@ -46,7 +46,10 @@ const unsigned int SCR_HEIGHT = 512;
 // Camera
 Camera camera((float) SCR_WIDTH / (float) SCR_HEIGHT,
               glm::vec3(0.0f, 0.0f, 7.0f),
-              glm::vec3(-90.0f, -13.3f, 0.0f));
+              glm::vec3(-87.78f, -14.0f, 0.0f));
+static float cameraPosition[3] = {camera.Position.x, camera.Position.y, camera.Position.z};
+static float cameraRotation[3] = {camera.Rotation.x, camera.Rotation.y, camera.Rotation.z};
+static float cameraZoom = 25.0f;
 
 float lastX = SCR_WIDTH / 2.0f;
 float lastY = SCR_HEIGHT / 2.0f;
@@ -115,15 +118,6 @@ int main() {
     Shader ScreenShader(vertexShaderPath, "../../src/shaders/fragment_shader_screen.glsl");
     Shader ToneMappingShader(vertexShaderPath,"../../src/shaders/fragment_shader_tone_mapping.glsl");
 
-    // Load Models
-    // -----------
-    Model sphere("../../resources/objects/sphere.obj");
-    Model quad("../../resources/objects/quad.obj");
-    Model bunny("../../resources/objects/bunny_4000.obj");
-    // Model plate("../../resources/objects/plate.obj");
-    // Model floor("../../resources/objects/floor.obj");
-    // Model teapot("../../resources/objects/teapot.obj");
-
     Screen screen;
     screen.InitScreenBind();
     screenBuffer.Init(width * RENDER_SCALE, height * RENDER_SCALE);
@@ -135,13 +129,12 @@ int main() {
 
 #pragma region Scene
 
-    // camera.Front = vec3(0, -0.23, -0.97);
-    // camera.Up = vec3(0, 0.97, -0.23);
     camera.Zoom = 25.0f;
 
     Material white;
     white.baseColor = vec3(0.73, 0.73, 0.73);
-    white.roughness = 1.0;
+    white.roughness = 0.5;
+    white.specular = 0.5;
 
     Material jade;
     jade.baseColor = vec3(0.55, 0.78, 0.55);
@@ -154,22 +147,20 @@ int main() {
     golden.roughness = 0.1;
     golden.specular = 1.0;
     golden.metallic = 1.0;
-    golden.clearcoat = 1.0;
 
-    // teapot
-    // getTriangle(teapot.meshes, triangles, white,
-    //             getTransformMatrix(vec3(0, 90, 0), vec3(0, -5.2, -5), vec3(2, 2, 2)), false);
+    // TODO GameObject
 
-    // bunny
-    getTriangle(bunny.meshes, triangles, jade,
-                getTransformMatrix(vec3(0, 0, 0), vec3(2, -2.5, 3), vec3(2, 2, 2)), false);
+    Material current_material = golden;
+    SetGlobalMaterialProperty(current_material);
 
-    // getTriangle(plate.meshes, triangles, white,
-    //             getTransformMatrix(vec3(0, 0, 0), vec3(0, -5, -5), vec3(20, 10, 5)), false);
-    // getTriangle(floor.meshes, triangles, white,
-    //             getTransformMatrix(vec3(0, 0, 0), vec3(0, -5.5, -5), vec3(200, 200, 200)), false);
-    // getTriangle(floor.meshes, triangles, cornell_box_light,
-    //             getTransformMatrix(vec3(0, 0, 0), vec3(0, 5, -5), vec3(1.5, 1, 10)), false);
+    // Model bunny("../../resources/objects/bunny_4000.obj");
+    // getTriangle(bunny.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0), vec3(2, -2.5, 3), vec3(2)), false);
+
+    Model dragon("../../resources/objects/dragon.obj");
+    getTriangle(dragon.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0), vec3(1.7, -2.2, 3), vec3(3.5)), true);
+
 #pragma endregion
 
     int nTriangles = triangles.size();
@@ -229,8 +220,7 @@ int main() {
     GLuint tbo0;
     glGenBuffers(1, &tbo0);
     glBindBuffer(GL_TEXTURE_BUFFER, tbo0);
-    glBufferData(GL_TEXTURE_BUFFER, triangles_encoded.size() * sizeof(Triangle_encoded), &triangles_encoded[0],
-                 GL_STATIC_DRAW);
+    glBufferData(GL_TEXTURE_BUFFER, triangles_encoded.size() * sizeof(Triangle_encoded), &triangles_encoded[0], GL_STATIC_DRAW);
     glGenTextures(1, &trianglesTextureBuffer);
     glBindTexture(GL_TEXTURE_BUFFER, trianglesTextureBuffer);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo0);
@@ -285,7 +275,11 @@ int main() {
     bool enableToneMapping = true;
     bool enableGammaCorrection = true;
     int maxBounce = 4;
-    int maxIterations = -1;
+    int maxIterations = 512;
+    for (int i = 0; i < 3; ++i) {
+        cameraPosition[i] = camera.Position[i];
+        cameraRotation[i] = camera.Rotation[i];
+    }
 
     // Render Loop
     // -----------
@@ -304,10 +298,14 @@ int main() {
         glfwGetFramebufferSize(window, &width, &height);
         ImGuiWindowFlags window_flags = 0;
         window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+#if __APPLE__
+        ImGui::SetNextWindowSizeConstraints(ImVec2(10,10), ImVec2(width, height / 2.0 - 20));
+#else
+        ImGui::SetNextWindowSizeConstraints(ImVec2(10,10), ImVec2(width, height - 20));
+#endif
         ImGui::Begin("Inspector", nullptr, window_flags);
-        ImGui::Text("RMB: look around");
-        ImGui::Text("MMS: zoom the view");
-        ImGui::Text("WASD: move camera");
+        ImGui::Text("RMB: rotate the camera");
+        ImGui::Text("WASDQE: move the camera");
         ImGui::Separator();
         if (ImGui::Checkbox("Enable HDR EnvMap", &enableEnvMap)) {
             camera.LoopNum = 0;
@@ -324,13 +322,21 @@ int main() {
         if (ImGui::SliderInt("Max Iterations", &maxIterations, -1, 3000)) {
             camera.LoopNum = 0;
         }
-        ImGui::Text("Iterations: %d", camera.LoopNum);
+        ImGui::SameLine(); Helper("-1: No Limit");
+        ImGui::Text("Iterations: %d / %d", camera.LoopNum, maxIterations);
         ImGui::Separator();
-        ImGui::Text("Camera Position: (%.2f, %.2f, %.2f)", camera.Position.x, camera.Position.y, camera.Position.z);
-        ImGui::Text("Camera Rotation: (%.2f, %.2f, %.2f)", camera.Rotation.x, camera.Rotation.y, camera.Rotation.z);
-        ImGui::Text("Camera Front: (%.2f, %.2f, %.2f)", camera.Front.x, camera.Front.y, camera.Front.z);
-        ImGui::Text("Camera Up: (%.2f, %.2f, %.2f)", camera.Up.x, camera.Up.y, camera.Up.z);
-        ImGui::Text("Camera Zoom: %.2f", camera.Zoom);
+        if (ImGui::InputFloat3("Camera Position", cameraPosition)) {
+            camera.Position = vec3(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+            camera.Refresh();
+        }
+        if (ImGui::InputFloat3("Camera Rotation", cameraRotation)) {
+            camera.Rotation = vec3(cameraRotation[0], cameraRotation[1], cameraRotation[2]);
+            camera.Refresh();
+        }
+        if (ImGui::SliderFloat("Camera Zoom", &cameraZoom, 1.0f, 45.0f)) {
+            camera.Zoom = cameraZoom;
+            camera.Refresh();
+        }
         ImGui::Separator();
         ImGui::Checkbox("Enable ToneMapping", &enableToneMapping);
         ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
@@ -338,9 +344,81 @@ int main() {
         // ImGui::Checkbox("Demo Window", &show_demo_window);
         // if (show_demo_window)
         //     ImGui::ShowDemoWindow(&show_demo_window);
-        if (ImGui::Button("Save Frame")) {
+        if (ImGui::Button("Save Image")) {
             SaveFrame("../../screenshot/screenshot_bunny_" + to_string(camera.LoopNum) + "_spp.png", width, height);
         }
+        ImGui::Separator();
+        if (ImGui::ColorEdit4("Base Color", baseColor)) {
+            current_material.baseColor = vec3(baseColor[0], baseColor[1], baseColor[2]);
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Subsurface", &subsurface, 0.0f, 1.0f)) {
+            current_material.subsurface = subsurface;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
+            current_material.metallic = metallic;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
+            current_material.roughness = roughness;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Specular", &specular, 0.0f, 1.0f)) {
+            current_material.specular = specular;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Specular Tine", &specularTint, 0.0f, 1.0f)) {
+            current_material.specularTint = specularTint;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Anisotropic", &anisotropic, 0.0f, 1.0f)) {
+            current_material.anisotropic = anisotropic;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::ColorEdit4("Emissive", emissive)) {
+            current_material.emissive = vec3(emissive[0], emissive[1], emissive[2]);
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Sheen", &sheen, 0.0f, 1.0f)) {
+            current_material.sheen = sheen;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Sheen Tint", &sheenTint, 0.0f, 1.0f)) {
+            current_material.sheenTint = sheenTint;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Clearcoat", &clearcoat, 0.0f, 1.0f)) {
+            current_material.clearcoat = clearcoat;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Clearcoat Gloss", &clearcoatGloss, 0.0f, 1.0f)) {
+            current_material.clearcoatGloss = clearcoatGloss;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("IOR", &IOR, 0.0f, 1.0f)) {
+            current_material.IOR = IOR;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Transmission", &transmission, 0.0f, 1.0f)) {
+            current_material.transmission = transmission;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+
         ImGui::End();
 
         if (maxIterations == -1 || camera.LoopNum < maxIterations) { camera.LoopIncrease(); }
@@ -442,6 +520,14 @@ void processInput(GLFWwindow *window) {
         camera.ProcessKeyboard(LEFT, deltaTime);
     if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
         camera.ProcessKeyboard(RIGHT, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_Q) == GLFW_PRESS)
+        camera.ProcessKeyboard(UP, deltaTime);
+    if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
+        camera.ProcessKeyboard(DOWN, deltaTime);
+
+    for (int i = 0; i < 3; ++i) {
+        cameraPosition[i] = camera.Position[i];
+    }
 }
 
 void framebuffer_size_callback(GLFWwindow *window, int width, int height) {
@@ -469,10 +555,13 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
 
     if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
         camera.ProcessMouseMovement(xoffset, yoffset);
+        for (int i = 0; i < 3; ++i) {
+            cameraRotation[i] = camera.Rotation[i];
+        }
     }
 }
 
 void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
-    camera.ProcessMouseScroll(static_cast<float>(yoffset));
+    // camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 

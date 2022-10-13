@@ -11,7 +11,9 @@ enum Camera_Movement {
     FORWARD,
     BACKWARD,
     LEFT,
-    RIGHT
+    RIGHT,
+    UP,
+    DOWN
 };
 
 const float YAW = -90.0f;
@@ -49,9 +51,7 @@ public:
     Camera(float screenRatio = 1.0f,
            glm::vec3 position = glm::vec3(0.0f, 0.0f, 0.0f),
            glm::vec3 rotation = glm::vec3(YAW, PITCH, 0.0f),
-           glm::vec3 up = glm::vec3(0.0f, 1.0f, 0.0f),
-           float yaw = YAW,
-           float pitch = PITCH) :
+           glm::vec3 worldUp = glm::vec3(0.0f, 1.0f, 0.0f)) :
             ViewMatrix(glm::mat4(1)),
             Front(glm::vec3(0.0f, 0.0f, -1.0f)),
             MovementSpeed(SPEED),
@@ -60,6 +60,7 @@ public:
 
         Position = position;
         Rotation = rotation;
+
         glm::mat4 rotationMat(1);
         rotationMat = glm::rotate(rotationMat, Rotation.x, glm::vec3(1.0, 0.0, 0.0));
         rotationMat = glm::rotate(rotationMat, Rotation.y, glm::vec3(0.0, 1.0, 0.0));
@@ -67,7 +68,7 @@ public:
         Up = glm::vec3(rotationMat * glm::vec4(Up, 1.0));
         Right = glm::vec3(rotationMat * glm::vec4(Right, 1.0));
 
-        WorldUp = up;
+        WorldUp = worldUp;
         Yaw = Rotation.x;
         Pitch = Rotation.y;
         ScreenRatio = screenRatio;
@@ -77,10 +78,6 @@ public:
         LeftBottomCorner = Front - halfW * Right - halfH * Up;
         LoopNum = 0;
         updateCameraVectors();
-    }
-
-    glm::mat4 GetViewMatrix() {
-        return glm::lookAt(Position, Position + Front, Up);
     }
 
     void ProcessKeyboard(Camera_Movement direction, float deltaTime) {
@@ -93,8 +90,26 @@ public:
             Position -= Right * velocity;
         if (direction == RIGHT)
             Position += Right * velocity;
+        if (direction == UP)
+            Position += Up * velocity;
+        if (direction == DOWN)
+            Position -= Up * velocity;
 
         LoopNum = 0;
+    }
+
+    glm::mat4 GetViewMatrix() {
+        return glm::lookAt(Position, Position + Front, Up);
+    }
+
+    void Rotate(glm::vec3 rotation) {
+        glm::mat4 rotationMat(1);
+        rotationMat = glm::rotate(rotationMat, rotation.x, glm::vec3(1.0, 0.0, 0.0));
+        rotationMat = glm::rotate(rotationMat, rotation.y, glm::vec3(0.0, 1.0, 0.0));
+        Front = glm::vec3(rotationMat * glm::vec4(Front, 1.0));
+        Up = glm::vec3(rotationMat * glm::vec4(Up, 1.0));
+        Right = glm::vec3(rotationMat * glm::vec4(Right, 1.0));
+        updateCameraVectors();
     }
 
     void ProcessMouseMovement(float xoffset, float yoffset, GLboolean constrainPitch = true) {
@@ -138,19 +153,13 @@ public:
     }
 
     void Refresh() {
-        Pitch = glm::degrees(asin(Front.y));
-        Yaw = glm::degrees(acos(Front.x / cos(glm::radians(Pitch)))) - 180;
-        Right = glm::normalize(glm::cross(Front, WorldUp));
-        Up = glm::normalize(glm::cross(Right, Front));
-        halfH = glm::tan(glm::radians(Zoom));
-        halfW = halfH * ScreenRatio;
-        LeftBottomCorner = Front - halfW * Right - halfH * Up;
-        Rotation = glm::vec3(Yaw, Pitch, 0.0f);
-        LoopNum = 0;
+        updateCameraVectors();
     }
 
 private:
     void updateCameraVectors() {
+        Yaw = Rotation.x;
+        Pitch = Rotation.y;
         glm::vec3 front;
         front.x = cos(glm::radians(Yaw)) * cos(glm::radians(Pitch));
         front.y = sin(glm::radians(Pitch));
