@@ -129,6 +129,11 @@ int main() {
 
 #pragma region Scene
 
+    Material plane;
+    plane.baseColor = vec3(0.73, 0.73, 0.73);
+    plane.roughness = 0.1;
+    plane.specular = 1.0;
+
     Material white;
     white.baseColor = vec3(0.73, 0.73, 0.73);
     white.roughness = 0.5;
@@ -148,16 +153,25 @@ int main() {
 
     // TODO GameObject
 
-    Material current_material = golden;
+    Material current_material = jade;
     SetGlobalMaterialProperty(current_material);
 
-    // Model bunny("../../resources/objects/bunny_4000.obj");
-    // getTriangle(bunny.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2, -2.5, 3), vec3(2)), false);
+    Model floor("../../resources/objects/floor.obj");
+    getTriangle(floor.meshes, triangles, plane,
+                getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
 
-    Model dragon("../../resources/objects/dragon.obj");
-    getTriangle(dragon.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0), vec3(2, -2.2, 3), vec3(3.5)), true);
+    Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
+    getTriangle(bunny.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
+
+    // Model loong("../../resources/objects/loong.obj");        // 100000 face
+    // getTriangle(loong.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0), vec3(2, -2.2, 3), vec3(3.5)), true);
+
+    // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
+    // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
+    // getTriangle(dragon.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
 
 #pragma endregion
 

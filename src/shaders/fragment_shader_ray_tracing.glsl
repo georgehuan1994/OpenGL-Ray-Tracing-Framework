@@ -1,7 +1,13 @@
 #version 330 core
 
-#define PI              3.1415926
+#define PI              3.14159265358979323
+#define INV_PI          0.31830988618379067
+#define TWO_PI          6.28318530717958648
+#define INV_TWO_PI      0.15915494309189533
+#define INV_4_PI        0.07957747154594766
+#define EPS             0.0001
 #define INF             114514.0
+
 #define SIZE_TRIANGLE   12
 #define SIZE_BVHNODE    4
 
@@ -62,7 +68,9 @@ struct Material {
     float clearcoat;
     float clearcoatGloss;
     float IOR;
-    float transmission;
+    float transmission;     // specTrans
+    float ax;
+    float ay;
 };
 
 // 相机参数，用于构建射线方向
@@ -148,6 +156,32 @@ vec2 sobolVec2(int i, int b) {
     float u = sobol(b * 2, grayCode(i));
     float v = sobol(b * 2 + 1, grayCode(i));
     return vec2(u, v);
+}
+
+// Luminance
+// ---------
+float Luminance(vec3 c)
+{
+    return 0.212671 * c.x + 0.715160 * c.y + 0.072169 * c.z;
+}
+
+// Normal Tangent Bitangent
+// ------------------------
+void Onb(in vec3 N, inout vec3 T, inout vec3 B)
+{
+    vec3 up = abs(N.z) < 0.999 ? vec3(0, 0, 1) : vec3(1, 0, 0);
+    T = normalize(cross(up, N));
+    B = cross(N, T);
+}
+
+vec3 ToWorld(vec3 X, vec3 Y, vec3 Z, vec3 V)
+{
+    return V.x * X + V.y * Y + V.z * Z;
+}
+
+vec3 ToLocal(vec3 X, vec3 Y, vec3 Z, vec3 V)
+{
+    return vec3(dot(V, X), dot(V, Y), dot(V, Z));
 }
 
 // 获取第 i 下标的三角形
@@ -298,9 +332,28 @@ vec3 toNormalHemisphere(vec3 v, vec3 N) {
     return v.x * tangent + v.y * bitangent + v.z * N;
 }
 
+vec3 CosineSampleHemisphere(float r1, float r2)
+{
+    vec3 dir;
+    float r = sqrt(r1);
+    float phi = TWO_PI * r2;
+    dir.x = r * cos(phi);
+    dir.y = r * sin(phi);
+    dir.z = sqrt(max(0.0, 1.0 - dir.x * dir.x - dir.y * dir.y));
+    return dir;
+}
+
 // 余弦加权的法向半球采样
 // ------------------
 vec3 SampleCosineHemisphere(float xi_1, float xi_2, vec3 N) {
+    vec3 dir;
+    float r = sqrt(r1);
+    float phi = TWO_PI * r2;
+    dir.x = r * cos(phi);
+    dir.y = r * sin(phi);
+    dir.z = sqrt(max(0.0, 1.0 - dir.x * dir.x - dir.y * dir.y));
+    return dir;
+
     // 均匀采样 xy 圆盘然后投影到 z 半球
     float r = sqrt(xi_1);
     float theta = xi_2 * 2.0 * PI;
@@ -310,27 +363,6 @@ vec3 SampleCosineHemisphere(float xi_1, float xi_2, vec3 N) {
 
     // 从 z 半球投影到法向半球
     vec3 L = toNormalHemisphere(vec3(x, y, z), N);
-    return L;
-}
-
-
-// GTR2 重要性采样
-vec3 SampleGTR2(float xi_1, float xi_2, vec3 V, vec3 N, float alpha) {
-
-    float phi_h = 2.0 * PI * xi_1;
-    float sin_phi_h = sin(phi_h);
-    float cos_phi_h = cos(phi_h);
-
-    float cos_theta_h = sqrt((1.0-xi_2)/(1.0+(alpha*alpha-1.0)*xi_2));
-    float sin_theta_h = sqrt(max(0.0, 1.0 - cos_theta_h * cos_theta_h));
-
-    // 采样 "微平面" 的法向量 作为镜面反射的半角向量 h
-    vec3 H = vec3(sin_theta_h*cos_phi_h, sin_theta_h*sin_phi_h, cos_theta_h);
-    H = toNormalHemisphere(H, N);   // 投影到真正的法向半球
-
-    // 根据 "微法线" 计算反射光方向
-    vec3 L = reflect(-V, H);
-
     return L;
 }
 
@@ -352,6 +384,75 @@ vec3 SampleGTR1(float xi_1, float xi_2, vec3 V, vec3 N, float alpha) {
     vec3 L = reflect(-V, H);
 
     return L;
+}
+
+vec3 SampleGTR1(float rgh, float r1, float r2)
+{
+    float a = max(0.001, rgh);
+    float a2 = a * a;
+
+    float phi = r1 * TWO_PI;
+
+    float cosTheta = sqrt((1.0 - pow(a2, 1.0 - r1)) / (1.0 - a2));
+    float sinTheta = clamp(sqrt(1.0 - (cosTheta * cosTheta)), 0.0, 1.0);
+    float sinPhi = sin(phi);
+    float cosPhi = cos(phi);
+
+    return vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+}
+
+// GTR2 重要性采样
+vec3 SampleGTR2(float xi_1, float xi_2, vec3 V, vec3 N, float alpha) {
+
+    float phi_h = 2.0 * PI * xi_1;
+    float sin_phi_h = sin(phi_h);
+    float cos_phi_h = cos(phi_h);
+
+    float cos_theta_h = sqrt((1.0-xi_2)/(1.0+(alpha*alpha-1.0)*xi_2));
+    float sin_theta_h = sqrt(max(0.0, 1.0 - cos_theta_h * cos_theta_h));
+
+    // 采样 "微平面" 的法向量 作为镜面反射的半角向量 h
+    vec3 H = vec3(sin_theta_h*cos_phi_h, sin_theta_h*sin_phi_h, cos_theta_h);
+    H = toNormalHemisphere(H, N);   // 投影到真正的法向半球
+
+    // 根据 "微法线" 计算反射光方向
+    vec3 L = reflect(-V, H);
+
+    return L;
+}
+
+vec3 SampleGTR2(float rgh, float r1, float r2)
+{
+    float a = max(0.001, rgh);
+
+    float phi = r1 * TWO_PI;
+
+    float cosTheta = sqrt((1.0 - r2) / (1.0 + (a * a - 1.0) * r2));
+    float sinTheta = clamp(sqrt(1.0 - (cosTheta * cosTheta)), 0.0, 1.0);
+    float sinPhi = sin(phi);
+    float cosPhi = cos(phi);
+
+    return vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta);
+}
+
+vec3 SampleGGXVNDF(vec3 V, float ax, float ay, float r1, float r2)
+{
+    vec3 Vh = normalize(vec3(ax * V.x, ay * V.y, V.z));
+
+    float lensq = Vh.x * Vh.x + Vh.y * Vh.y;
+    vec3 T1 = lensq > 0 ? vec3(-Vh.y, Vh.x, 0) * inversesqrt(lensq) : vec3(1, 0, 0);
+    vec3 T2 = cross(Vh, T1);
+
+    float r = sqrt(r1);
+    float phi = 2.0 * PI * r2;
+    float t1 = r * cos(phi);
+    float t2 = r * sin(phi);
+    float s = 0.5 * (1.0 + Vh.z);
+    t2 = (1.0 - s) * sqrt(1.0 - t1 * t1) + s * t2;
+
+    vec3 Nh = t1 * T1 + t2 * T2 + sqrt(max(0.0, 1.0 - t1 * t1 - t2 * t2)) * Vh;
+
+    return normalize(vec3(ax * Nh.x, ay * Nh.y, max(0.0, Nh.z)));
 }
 
 // 按照辐射度分布分别采样三种 BRDF
@@ -567,40 +668,341 @@ vec2 CranleyPattersonRotation(vec2 p) {
     return p;
 }
 
-// Schlick 近似
-// -----------
+// Normal Distribution: Generalized-Trowbridge-Reitz, γ=1, Berry
+// -------------------------------------------------------------
+float GTR1(float NdotH, float a) {
+    if (a >= 1) return INV_PI;
+    float a2 = a * a;
+    float t = 1 + (a2 - 1) * NdotH * NdotH;
+    return (a2 - 1) / (PI * log(a2) * t);
+}
+
+// Normal Distribution: Generalized-Trowbridge-Reitz, γ=2, Trowbridge-Reitz
+// -------------------------------------------------------------
+float GTR2(float NdotH, float a) {
+    float a2 = a * a;
+    float t = 1 + (a2 - 1) * NdotH * NdotH;
+    return a2 / (PI * t * t);
+}
+
+float GTR2Aniso(float NdotH, float HdotX, float HdotY, float ax, float ay) {
+    return 1 / (PI * ax*ay * sqr( sqr(HdotX/ax) + sqr(HdotY/ay) + NdotH*NdotH ));
+}
+
+// Geometry
+// --------
+float smithG_GGX(float NdotV, float alphaG) {
+    float a = alphaG * alphaG;
+    float b = NdotV * NdotV;
+    return 1 / (NdotV + sqrt(a + b - a * b));
+}
+
+// Geometry
+// --------
+float smithG_GGX_aniso(float NdotV, float VdotX, float VdotY, float ax, float ay) {
+    return 1 / (NdotV + sqrt( sqr(VdotX*ax) + sqr(VdotY*ay) + sqr(NdotV) ));
+}
+
+// Schlick Fresnel
+// ---------------
 float SchlickFresnel(float u) {
-    float m = clamp(1-u, 0, 1);
+    float m = clamp(1.0 - u, 0.0, 1.0);
     float m2 = m * m;
     return m2 * m2 * m; // pow(m,5)
 }
 
-float GTR1(float NdotH, float a) {
-    if (a >= 1) return 1/PI;
-    float a2 = a*a;
-    float t = 1 + (a2-1) * NdotH * NdotH;
-    return (a2-1) / (PI * log(a2) * t);
+// Dielectric Fresnel
+// ------------------
+float DielectricFresnel(float cosThetaI, float eta)
+{
+    float sinThetaTSq = eta * eta * (1.0f - cosThetaI * cosThetaI);
+
+    // Total internal reflection
+    if (sinThetaTSq > 1.0)
+    return 1.0;
+
+    float cosThetaT = sqrt(max(1.0 - sinThetaTSq, 0.0));
+
+    float rs = (eta * cosThetaT - cosThetaI) / (eta * cosThetaT + cosThetaI);
+    float rp = (eta * cosThetaI - cosThetaT) / (eta * cosThetaI + cosThetaT);
+
+    return 0.5f * (rs * rs + rp * rp);
 }
 
-float GTR2(float NdotH, float a) {
-    float a2 = a*a;
-    float t = 1 + (a2-1) * NdotH * NdotH;
-    return a2 / (PI * t*t);
+// Disney Fresnel
+// --------------
+float DisneyFresnel(Material mat, float eta, float LDotH, float VDotH)
+{
+    float metallicFresnel = SchlickFresnel(LDotH);
+    float dielectricFresnel = DielectricFresnel(abs(VDotH), eta);
+    return mix(dielectricFresnel, metallicFresnel, mat.metallic);
 }
 
-float GTR2_aniso(float NdotH, float HdotX, float HdotY, float ax, float ay) {
-    return 1 / (PI * ax*ay * sqr( sqr(HdotX/ax) + sqr(HdotY/ay) + NdotH*NdotH ));
+// Evaluation of Diffuse
+// ---------------------
+vec3 EvalDiffuse(Material mat, vec3 Csheen, vec3 V, vec3 L, vec3 H, out float pdf)
+{
+    pdf = 0.0;
+    if (L.z <= 0.0)
+    return vec3(0.0);
+
+    // Diffuse
+    float FL = SchlickFresnel(L.z);
+    float FV = SchlickFresnel(V.z);
+    float FH = SchlickFresnel(dot(L, H));
+    float Fd90 = 0.5 + 2.0 * dot(L, H) * dot(L, H) * mat.roughness;
+    float Fd = mix(1.0, Fd90, FL) * mix(1.0, Fd90, FV);
+
+    // Fake Subsurface TODO: use volumetric scattering
+    float Fss90 = dot(L, H) * dot(L, H) * mat.roughness;
+    float Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV);
+    float ss = 1.25 * (Fss * (1.0 / (L.z + V.z) - 0.5) + 0.5);
+
+    // Sheen
+    vec3 Fsheen = FH * mat.sheen * Csheen;
+
+    pdf = L.z * INV_PI;
+    // return (1.0 - mat.metallic) * (1.0 - mat.specTrans) * (INV_PI * mix(Fd, ss, mat.subsurface) * mat.baseColor + Fsheen);
+    return (1.0 - mat.metallic) * (1.0 - mat.transmission) * (INV_PI * mix(Fd, ss, mat.subsurface) * mat.baseColor + Fsheen);
 }
 
-float smithG_GGX(float NdotV, float alphaG) {
-    float a = alphaG*alphaG;
-    float b = NdotV*NdotV;
-    return 1 / (NdotV + sqrt(a + b - a*b));
+// Evaluation of SpecReflection
+// ----------------------------
+vec3 EvalSpecReflection(Material mat, float eta, vec3 specCol, vec3 V, vec3 L, vec3 H, out float pdf)
+{
+    pdf = 0.0;
+    if (L.z <= 0.0)
+    return vec3(0.0);
+
+    float FM = DisneyFresnel(mat, eta, dot(L, H), dot(V, H));
+    vec3 F = mix(specCol, vec3(1.0), FM);
+    float D = GTR2Aniso(H.z, H.x, H.y, mat.ax, mat.ay);
+    float G1 = smithG_GGX_aniso(abs(V.z), V.x, V.y, mat.ax, mat.ay);
+    float G2 = G1 * smithG_GGX_aniso(abs(L.z), L.x, L.y, mat.ax, mat.ay);
+
+    pdf = G1 * D / (4.0 * V.z);
+    return F * D * G2 / (4.0 * L.z * V.z);
 }
 
-// 弃用
-float smithG_GGX_aniso(float NdotV, float VdotX, float VdotY, float ax, float ay) {
-    return 1 / (NdotV + sqrt( sqr(VdotX*ax) + sqr(VdotY*ay) + sqr(NdotV) ));
+// Evaluation of SpecReflection
+// ----------------------------
+vec3 EvalSpecRefraction(Material mat, float eta, vec3 V, vec3 L, vec3 H, out float pdf)
+{
+    pdf = 0.0;
+    if (L.z >= 0.0)
+    return vec3(0.0);
+
+    float F = DielectricFresnel(abs(dot(V, H)), eta);
+    float D = GTR2Aniso(H.z, H.x, H.y, mat.ax, mat.ay);
+    float G1 = smithG_GGX_aniso(abs(V.z), V.x, V.y, mat.ax, mat.ay);
+    float G2 = G1 * smithG_GGX_aniso(abs(L.z), L.x, L.y, mat.ax, mat.ay);
+    float denom = dot(L, H) + dot(V, H) * eta;
+    denom *= denom;
+    float eta2 = eta * eta;
+    float jacobian = abs(dot(L, H)) / denom;
+
+    pdf = G1 * max(0.0, dot(V, H)) * D * jacobian / V.z;
+
+    return pow(mat.baseColor, vec3(0.5)) * (1.0 - mat.metallic) * mat.transmission * (1.0 - F) * D * G2 * abs(dot(V, H)) * jacobian * eta2 / abs(L.z * V.z);
+}
+
+// Evaluation of Clearcoat
+// -----------------------
+vec3 EvalClearcoat(Material mat, vec3 V, vec3 L, vec3 H, out float pdf)
+{
+    pdf = 0.0;
+    if (L.z <= 0.0)
+    return vec3(0.0);
+
+    float FH = DielectricFresnel(dot(V, H), 1.0 / 1.5);
+    float F = mix(0.04, 1.0, FH);
+    float D = GTR1(H.z, mat.clearcoatGloss);
+    float G = smithG_GGX(L.z, 0.25) * smithG_GGX(V.z, 0.25);
+    float jacobian = 1.0 / (4.0 * dot(V, H));
+
+    pdf = D * H.z * jacobian;
+    return vec3(0.25) * mat.clearcoat * F * D * G / (4.0 * L.z * V.z);
+}
+
+// Specular Color
+// --------------
+void GetSpecColor(Material mat, float eta, out vec3 specCol, out vec3 sheenCol)
+{
+    float lum = Luminance(mat.baseColor);
+    vec3 ctint = lum > 0.0 ? mat.baseColor / lum : vec3(1.0f);
+    float F0 = (1.0 - eta) / (1.0 + eta);
+    specCol = mix(F0 * F0 * mix(vec3(1.0), ctint, mat.specularTint), mat.baseColor, mat.metallic);
+    sheenCol = mix(vec3(1.0), ctint, mat.sheenTint);
+}
+
+// Lobe Probabilities
+// ------------------
+void GetLobeProbabilities(Material mat, float eta, vec3 specCol, float approxFresnel, out float diffuseWt, out float specReflectWt, out float specRefractWt, out float clearcoatWt)
+{
+    diffuseWt = Luminance(mat.baseColor) * (1.0 - mat.metallic) * (1.0 - mat.transmission);
+    specReflectWt = Luminance(mix(specCol, vec3(1.0), approxFresnel));
+    specRefractWt = (1.0 - approxFresnel) * (1.0 - mat.metallic) * mat.transmission * Luminance(mat.baseColor);
+    clearcoatWt = 0.25 * mat.clearcoat * (1.0 - mat.metallic);
+    float totalWt = diffuseWt + specReflectWt + specRefractWt + clearcoatWt;
+
+    diffuseWt /= totalWt;
+    specReflectWt /= totalWt;
+    specRefractWt /= totalWt;
+    clearcoatWt /= totalWt;
+}
+
+// Disney Sample Color
+// -------------------
+vec3 DisneySample(State state, vec3 V, vec3 N, out vec3 L, out float pdf)
+{
+    pdf = 0.0;
+    vec3 f = vec3(0.0);
+
+    float r1 = rand();
+    float r2 = rand();
+
+    // TODO: Tangent and bitangent should be calculated from mesh (provided, the mesh has proper uvs)
+    vec3 T, B;
+    Onb(N, T, B);
+    V = ToLocal(T, B, N, V); // NDotL = L.z; NDotV = V.z; NDotH = H.z
+
+    // Specular and sheen color
+    vec3 specCol, sheenCol;
+    GetSpecColor(state.mat, state.eta, specCol, sheenCol);
+
+    // Lobe weights
+    float diffuseWt, specReflectWt, specRefractWt, clearcoatWt;
+    // Note: Fresnel is approx and based on N and not H since H isn't available at this stage.
+    float approxFresnel = DisneyFresnel(state.mat, state.eta, V.z, V.z);
+    GetLobeProbabilities(state.mat, state.eta, specCol, approxFresnel, diffuseWt, specReflectWt, specRefractWt, clearcoatWt);
+
+    // CDF for picking a lobe
+    float cdf[4];
+    cdf[0] = diffuseWt;
+    cdf[1] = cdf[0] + clearcoatWt;
+    cdf[2] = cdf[1] + specReflectWt;
+    cdf[3] = cdf[2] + specRefractWt;
+
+    if (r1 < cdf[0]) // Diffuse Reflection Lobe
+    {
+        r1 /= cdf[0];
+        L = CosineSampleHemisphere(r1, r2);
+
+        vec3 H = normalize(L + V);
+
+        f = EvalDiffuse(state.mat, sheenCol, V, L, H, pdf);
+        pdf *= diffuseWt;
+    }
+    else if (r1 < cdf[1]) // Clearcoat Lobe
+    {
+        r1 = (r1 - cdf[0]) / (cdf[1] - cdf[0]);
+
+        vec3 H = SampleGTR1(state.mat.clearcoatRoughness, r1, r2);
+
+        if (H.z < 0.0)
+        H = -H;
+
+        L = normalize(reflect(-V, H));
+
+        f = EvalClearcoat(state.mat, V, L, H, pdf);
+        pdf *= clearcoatWt;
+    }
+    else  // Specular Reflection/Refraction Lobes
+    {
+        r1 = (r1 - cdf[1]) / (1.0 - cdf[1]);
+        vec3 H = SampleGGXVNDF(V, state.mat.ax, state.mat.ay, r1, r2);
+
+        if (H.z < 0.0)
+        H = -H;
+
+        // TODO: Refactor into metallic BRDF and specular BSDF
+        float fresnel = DisneyFresnel(state.mat, state.eta, dot(L, H), dot(V, H));
+        float F = 1.0 - ((1.0 - fresnel) * state.mat.specTrans * (1.0 - state.mat.metallic));
+
+        if (rand() < F)
+        {
+            L = normalize(reflect(-V, H));
+
+            f = EvalSpecReflection(state.mat, state.eta, specCol, V, L, H, pdf);
+            pdf *= F;
+        }
+        else
+        {
+            L = normalize(refract(-V, H, state.eta));
+
+            f = EvalSpecRefraction(state.mat, state.eta, V, L, H, pdf);
+            pdf *= 1.0 - F;
+        }
+
+        pdf *= specReflectWt + specRefractWt;
+    }
+
+    L = ToWorld(T, B, N, L);
+    return f * abs(dot(N, L));
+}
+
+// Evaluation of Disney BSDF
+// -------------------------
+vec3 DisneyEval(State state, vec3 V, vec3 N, vec3 L, out float bsdfPdf)
+{
+    bsdfPdf = 0.0;
+    vec3 f = vec3(0.0);
+
+    // TODO: Tangent and bitangent should be calculated from mesh (provided, the mesh has proper uvs)
+    vec3 T, B;
+    Onb(N, T, B);
+    V = ToLocal(T, B, N, V); // NDotL = L.z; NDotV = V.z; NDotH = H.z
+    L = ToLocal(T, B, N, L);
+
+    vec3 H;
+    if (L.z > 0.0)
+    H = normalize(L + V);
+    else
+    H = normalize(L + V * state.eta);
+
+    if (H.z < 0.0)
+    H = -H;
+
+    // Specular and sheen color
+    vec3 specCol, sheenCol;
+    GetSpecColor(state.mat, state.eta, specCol, sheenCol);
+
+    // Lobe weights
+    float diffuseWt, specReflectWt, specRefractWt, clearcoatWt;
+    float fresnel = DisneyFresnel(state.mat, state.eta, dot(L, H), dot(V, H));
+    GetLobeProbabilities(state.mat, state.eta, specCol, fresnel, diffuseWt, specReflectWt, specRefractWt, clearcoatWt);
+
+    float pdf;
+
+    // Diffuse
+    if (diffuseWt > 0.0 && L.z > 0.0)
+    {
+        f += EvalDiffuse(state.mat, sheenCol, V, L, H, pdf);
+        bsdfPdf += pdf * diffuseWt;
+    }
+
+    // Specular Reflection
+    if (specReflectWt > 0.0 && L.z > 0.0 && V.z > 0.0)
+    {
+        f += EvalSpecReflection(state.mat, state.eta, specCol, V, L, H, pdf);
+        bsdfPdf += pdf * specReflectWt;
+    }
+
+    // Specular Refraction
+    if (specRefractWt > 0.0 && L.z < 0.0)
+    {
+        f += EvalSpecRefraction(state.mat, state.eta, V, L, H, pdf);
+        bsdfPdf += pdf * specRefractWt;
+    }
+
+    // Clearcoat
+    if (clearcoatWt > 0.0 && L.z > 0.0 && V.z > 0.0)
+    {
+        f += EvalClearcoat(state.mat, V, L, H, pdf);
+        bsdfPdf += pdf * clearcoatWt;
+    }
+
+    return f * abs(L.z);
 }
 
 vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material) {
@@ -643,9 +1045,9 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material)
 
     // 镜面反射 -- 各向异性
     float aspect = sqrt(1.0 - material.anisotropic * 0.9);
-    float ax = max(0.001, sqr(material.roughness)/aspect);
-    float ay = max(0.001, sqr(material.roughness)*aspect);
-    float Ds = GTR2_aniso(NdotH, dot(H, X), dot(H, Y), ax, ay);
+    float ax = max(0.001, sqr(material.roughness) / aspect);
+    float ay = max(0.001, sqr(material.roughness) * aspect);
+    float Ds = GTR2Aniso(NdotH, dot(H, X), dot(H, Y), ax, ay);
     float FH = SchlickFresnel(LdotH);
     vec3 Fs = mix(Cspec0, vec3(1), FH);
     float Gs;
@@ -684,13 +1086,13 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material) {
     vec3 Cspec0 = mix(0.08*Cspec, Cdlin, material.metallic); // 0° 镜面反射颜色
     vec3 Csheen = mix(vec3(1), Ctint, material.sheenTint);   // 织物颜色
 
-    // 漫反射
+    // 漫反射 EvalDiffuse
     float Fd90 = 0.5 + 2.0 * LdotH * LdotH * material.roughness;
     float FL = SchlickFresnel(NdotL);
     float FV = SchlickFresnel(NdotV);
     float Fd = mix(1.0, Fd90, FL) * mix(1.0, Fd90, FV);
 
-    // 次表面散射
+    // 伪次表面散射 Fake Subsurface TODO: Replace with volumetric scattering
     float Fss90 = LdotH * LdotH * material.roughness;
     float Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV);
     float ss = 1.25 * (Fss * (1.0 / (NdotL + NdotV) - 0.5) + 0.5);
@@ -871,9 +1273,11 @@ vec3 shadingImportanceSampling(HitRecord hit) {
                 float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
 
                 // 多重重要性采样
-//                float mis_weight = misMixWeight(pdf_light, pdf_brdf);
-//                Lo += mis_weight * history * skyColor * f_r * dot(N, L) / pdf_light;
-                 Lo += history * skyColor * f_r * dot(N, L) / pdf_light;   // 常规
+              float mis_weight = misMixWeight(pdf_light, pdf_brdf);
+              Lo += mis_weight * history * skyColor * f_r * dot(N, L) / pdf_light;
+
+                // 光源重要性采样
+//                Lo += history * skyColor * f_r * dot(N, L) / pdf_light;
             }
         }
 
@@ -909,9 +1313,11 @@ vec3 shadingImportanceSampling(HitRecord hit) {
                 float pdf_light = hdrPdf(L, hdrResolution);
 
                 // 多重重要性采样
-//                float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
-//                Lo += mis_weight * history * color * f_r * NdotL / pdf_brdf;
-                Lo += history * skyColor * f_r * NdotL / pdf_brdf;   // 常规
+                float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
+                Lo += mis_weight * history * skyColor * f_r * NdotL / pdf_brdf;
+
+                // BRDF 重要性采样
+//                Lo += history * skyColor * f_r * NdotL / pdf_brdf;
                 break;
             }
             else {
