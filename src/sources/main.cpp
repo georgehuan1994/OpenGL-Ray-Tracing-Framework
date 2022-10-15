@@ -420,7 +420,7 @@ int main() {
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;
         }
-        if (ImGui::SliderFloat("IOR", &IOR, 0.0f, 1.0f)) {
+        if (ImGui::SliderFloat("IOR", &IOR, 0.0f, 1.5f)) {
             current_material.IOR = IOR;
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;

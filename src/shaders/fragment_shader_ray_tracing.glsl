@@ -73,6 +73,38 @@ struct Material {
     float ay;
 };
 
+float DisneyFresnel(Material mat, float eta, float LDotH, float VDotH);
+vec3 EvalSpecRefraction(Material mat, float eta, vec3 V, vec3 L, vec3 H, out float pdf);
+vec3 EvalSpecReflection(Material mat, float eta, vec3 specCol, vec3 V, vec3 L, vec3 H, out float pdf);
+
+struct Medium
+{
+    int type;
+    float density;
+    vec3 color;
+    float anisotropy;
+};
+
+struct State
+{
+    int depth;
+    float eta;
+    float hitDist;
+
+    vec3 fhp;
+    vec3 normal;
+    vec3 ffnormal;
+    vec3 tangent;
+    vec3 bitangent;
+
+    bool isEmitter;
+
+    vec2 texCoord;
+    int matID;
+    Material mat;
+    Medium medium;
+};
+
 // 相机参数，用于构建射线方向
 // ---------------------
 struct Camera {
@@ -346,13 +378,13 @@ vec3 CosineSampleHemisphere(float r1, float r2)
 // 余弦加权的法向半球采样
 // ------------------
 vec3 SampleCosineHemisphere(float xi_1, float xi_2, vec3 N) {
-    vec3 dir;
-    float r = sqrt(r1);
-    float phi = TWO_PI * r2;
-    dir.x = r * cos(phi);
-    dir.y = r * sin(phi);
-    dir.z = sqrt(max(0.0, 1.0 - dir.x * dir.x - dir.y * dir.y));
-    return dir;
+//    vec3 dir;
+//    float r = sqrt(xi_1);
+//    float phi = TWO_PI * xi_2;
+//    dir.x = r * cos(phi);
+//    dir.y = r * sin(phi);
+//    dir.z = sqrt(max(0.0, 1.0 - dir.x * dir.x - dir.y * dir.y));
+//    return dir;
 
     // 均匀采样 xy 圆盘然后投影到 z 半球
     float r = sqrt(xi_1);
@@ -473,19 +505,57 @@ vec3 SampleBRDF(float xi_1, float xi_2, float xi_3, vec3 V, vec3 N, in Material 
 
     // 按照概率采样
     float rd = xi_3;
+    vec3 L = vec3(0, 0, 0);
 
     // 漫反射
     if(rd <= p_diffuse) {
         return SampleCosineHemisphere(xi_1, xi_2, N);
     }
-    // 镜面反射
-    else if(p_diffuse < rd && rd <= p_diffuse + p_specular) {
-        return SampleGTR2(xi_1, xi_2, V, N, alpha_GTR2);
-    }
     // 清漆
     else if(p_diffuse + p_specular < rd) {
         return SampleGTR1(xi_1, xi_2, V, N, alpha_GTR1);
     }
+//    // 镜面反射 Specular Reflection
+//    else if(p_diffuse < rd && rd <= p_diffuse + p_specular) {
+//        return SampleGTR2(xi_1, xi_2, V, N, alpha_GTR2);
+//    }
+    // Specular Reflection/Refraction Lobes
+    else {
+//        xi_1 = (xi_1 - (p_diffuse + p_clearcoat)) / (1.0 - (p_diffuse + p_clearcoat));
+//        vec3 H = SampleGGXVNDF(V, material.ax, material.ay, xi_1, xi_2);
+        vec3 H = normalize(L + V);
+        if (H.z < 0.0)
+            H = -H;
+
+//        if (N.z < 0.0)
+//            N = -N;
+
+        // TODO: Refactor into metallic BRDF and specular BSDF
+        float eta = dot(-V, N) < 0.0 ? (1.0 / material.IOR) : material.IOR;
+        float fresnel = DisneyFresnel(material, eta, dot(L, H), dot(V, H));
+        float F = 1.0 - ((1.0 - fresnel) * material.transmission * (1.0 - material.metallic));
+//        float F = 1.0 - ((1.0 - 1) * material.transmission * (1.0 - material.metallic));
+
+//        return normalize(refract(V, N, eta));
+
+        if (rand() < F) // rand() < F
+        {
+            return SampleGTR2(xi_1, xi_2, V, N, alpha_GTR2);
+//            L = normalize(reflect(-V, H));
+//            f = EvalSpecReflection(material, eta, specCol, V, L, H, pdf);
+//            pdf *= F;
+        }
+        else
+        {
+            return normalize(refract(-V, N, eta));
+//            return normalize(refract(-V, H, eta));
+//            L = normalize(refract(-V, H, eta));
+//            f = EvalSpecRefraction(state.mat, state.eta, V, L, H, pdf);
+//            pdf *= 1.0 - F;
+        }
+//        pdf *= specReflectWt + specRefractWt;
+    }
+
     return vec3(0, 1, 0);
 }
 
@@ -897,7 +967,7 @@ vec3 DisneySample(State state, vec3 V, vec3 N, out vec3 L, out float pdf)
     {
         r1 = (r1 - cdf[0]) / (cdf[1] - cdf[0]);
 
-        vec3 H = SampleGTR1(state.mat.clearcoatRoughness, r1, r2);
+        vec3 H = SampleGTR1(state.mat.clearcoatGloss, r1, r2);
 
         if (H.z < 0.0)
         H = -H;
@@ -917,7 +987,7 @@ vec3 DisneySample(State state, vec3 V, vec3 N, out vec3 L, out float pdf)
 
         // TODO: Refactor into metallic BRDF and specular BSDF
         float fresnel = DisneyFresnel(state.mat, state.eta, dot(L, H), dot(V, H));
-        float F = 1.0 - ((1.0 - fresnel) * state.mat.specTrans * (1.0 - state.mat.metallic));
+        float F = 1.0 - ((1.0 - fresnel) * state.mat.transmission * (1.0 - state.mat.metallic));
 
         if (rand() < F)
         {
@@ -1008,11 +1078,12 @@ vec3 DisneyEval(State state, vec3 V, vec3 N, vec3 L, out float bsdfPdf)
 vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material) {
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
-    if(NdotL < 0 || NdotV < 0) return vec3(0);
+//    if(NdotL < 0 || NdotV < 0) return vec3(0);
 
     vec3 H = normalize(L + V);
     float NdotH = dot(N, H);
     float LdotH = dot(L, H);
+    float VdotH = dot(V, H);
 
     // 各种颜色
     vec3 Cdlin = material.baseColor;
@@ -1032,6 +1103,8 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material)
     float Fss90 = LdotH * LdotH * material.roughness;
     float Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV);
     float ss = 1.25 * (Fss * (1.0 / (NdotL + NdotV) - 0.5) + 0.5);
+
+    float eta = dot(-V, N) < 0.0 ? (1.0 / material.IOR) : material.IOR;
 
     /*
     // 镜面反射 -- 各向同性
@@ -1054,6 +1127,13 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material)
     Gs  = smithG_GGX_aniso(NdotL, dot(L, X), dot(L, Y), ax, ay);
     Gs *= smithG_GGX_aniso(NdotV, dot(V, X), dot(V, Y), ax, ay);
 
+    // Refraction
+    float F = DielectricFresnel(abs(VdotH), eta);
+    float denom = LdotH + VdotH * eta;
+    denom *= denom;
+    float eta2 = eta * eta;
+    float jacbian = abs(LdotH) / denom;
+
     // 清漆
     float Dr = GTR1(NdotH, mix(0.1, 0.001, material.clearcoatGloss));
     float Fr = mix(0.04, 1.0, FH);
@@ -1065,28 +1145,31 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material)
     vec3 diffuse = (1.0/PI) * mix(Fd, ss, material.subsurface) * Cdlin + Fsheen;
     vec3 specular = Gs * Fs * Ds;
     vec3 clearcoat = vec3(0.25 * Gr * Fr * Dr * material.clearcoat);
+    vec3 refraction = pow(material.baseColor, vec3(0.5)) * (1.0 - material.metallic) * material.transmission * (1.0 - F) * Ds * Gs * abs(VdotH) * jacbian * eta2 / abs(L.z / V.z);
 
     return diffuse * (1.0 - material.metallic) + specular + clearcoat;
 }
 
+
 vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material) {
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
-    if(NdotL < 0 || NdotV < 0) return vec3(0);
+//    if(NdotL < 0 || NdotV < 0) return vec3(0);
 
     vec3 H = normalize(L + V);
     float NdotH = dot(N, H);
     float LdotH = dot(L, H);
+    float VdotH = dot(V, H);
 
-    // 各种颜色
+    // Color
     vec3 Cdlin = material.baseColor;
-    float Cdlum = 0.3 * Cdlin.r + 0.6 * Cdlin.g  + 0.1 * Cdlin.b;
+    float Cdlum = Luminance(Cdlin);
     vec3 Ctint = (Cdlum > 0) ? (Cdlin/Cdlum) : (vec3(1));
     vec3 Cspec = material.specular * mix(vec3(1), Ctint, material.specularTint);
-    vec3 Cspec0 = mix(0.08*Cspec, Cdlin, material.metallic); // 0° 镜面反射颜色
+    vec3 Cspec0 = mix(0.08 * Cspec, Cdlin, material.metallic); // 0° 镜面反射颜色
     vec3 Csheen = mix(vec3(1), Ctint, material.sheenTint);   // 织物颜色
 
-    // 漫反射 EvalDiffuse
+    // 漫反射 Diffuse
     float Fd90 = 0.5 + 2.0 * LdotH * LdotH * material.roughness;
     float FL = SchlickFresnel(NdotL);
     float FV = SchlickFresnel(NdotV);
@@ -1098,12 +1181,21 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material) {
     float ss = 1.25 * (Fss * (1.0 / (NdotL + NdotV) - 0.5) + 0.5);
 
     // 镜面反射 -- 各向同性
+    // float FH = SchlickFresnel(LdotH);
+    float eta = dot(-V, N) < 0.0 ? (1.0 / material.IOR) : material.IOR;
+    float FH = DisneyFresnel(material, eta, LdotH, VdotH);
     float alpha = max(0.001, sqr(material.roughness));
-    float Ds = GTR2(NdotH, alpha);
-    float FH = SchlickFresnel(LdotH);
-    vec3 Fs = mix(Cspec0, vec3(1), FH);
-    float Gs = smithG_GGX(NdotL, material.roughness);
+    float   Ds = GTR2(NdotH, alpha);
+    vec3    Fs = mix(Cspec0, vec3(1), FH);
+    float   Gs = smithG_GGX(NdotL, material.roughness);
     Gs *= smithG_GGX(NdotV, material.roughness);
+
+    // Refraction
+    float F = DielectricFresnel(abs(VdotH), eta);
+    float denom = LdotH + VdotH * eta;
+    denom *= denom;
+    float eta2 = eta * eta;
+    float jacbian = abs(LdotH) / denom;
 
     // 清漆
     float Dr = GTR1(NdotH, mix(0.1, 0.001, material.clearcoatGloss));
@@ -1113,11 +1205,17 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material) {
     // sheen
     vec3 Fsheen = FH * material.sheen * Csheen;
 
-    vec3 diffuse = (1.0/PI) * mix(Fd, ss, material.subsurface) * Cdlin + Fsheen;
+
+    vec3 diffuse = INV_PI * mix(Fd, ss, material.subsurface) * Cdlin + Fsheen;
     vec3 specular = Gs * Fs * Ds;
     vec3 clearcoat = vec3(0.25 * Gr * Fr * Dr * material.clearcoat);
+    vec3 refraction = pow(Cdlin, vec3(0.5)) * (1.0 - material.metallic) * material.transmission * (1.0 - F) * Ds * Gs * abs(VdotH) * jacbian * eta2 / abs(NdotV / NdotL);
 
-    return diffuse * (1.0 - material.metallic) + specular + clearcoat;
+    // BSDF
+    return (1.0 - material.metallic) * (1.0 - material.transmission) * diffuse + specular + clearcoat + refraction;
+
+    // BRDF
+    // return (1.0 - material.metallic) * diffuse + specular + clearcoat;
 }
 
 // 获取 BRDF 在 L 方向上的概率密度
@@ -1129,32 +1227,42 @@ float BRDF_Pdf(vec3 V, vec3 N, vec3 L, in Material material) {
     vec3 H = normalize(L + V);
     float NdotH = dot(N, H);
     float LdotH = dot(L, H);
+    float VdotH = dot(V, H);
+    float eta = dot(-V, N) < 0.0 ? (1.0 / material.IOR) : material.IOR;
+    float denom = LdotH + VdotH * eta;
+    float jacobian = abs(LdotH) / denom;
 
     // 镜面反射 -- 各向同性
     float alpha = max(0.001, sqr(material.roughness));
     float Ds = GTR2(NdotH, alpha);
     float Dr = GTR1(NdotH, mix(0.1, 0.001, material.clearcoatGloss));   // 清漆
+    float fresnel = DisneyFresnel(material, eta, LdotH, VdotH);
+    // float F = 1.0 - ((1.0 - fresnel) * material.transmission * (1.0 - material.metallic));
 
     // 分别计算三种 BRDF 的概率密度
-    float pdf_diffuse = NdotL / PI;
-    float pdf_specular = Ds * NdotH / (4.0 * dot(L, H));
-    float pdf_clearcoat = Dr * NdotH / (4.0 * dot(L, H));
+    float pdf_diffuse = NdotL * INV_PI; // L.z * INV_PI
+    float pdf_specular = Ds * NdotH / (4.0 * LdotH);
+    float pdf_clearcoat = Dr * NdotH / (4.0 * LdotH);
+    float pdf_refraction = max(0.0, VdotH) * Ds * NdotH * jacobian / NdotL;
 
     // 辐射度统计
-    float r_diffuse = (1.0 - material.metallic);
+    // float r_diffuse = (1.0 - material.metallic);
+    float r_diffuse = (1.0 - material.metallic) * (1.0 - material.transmission);
     float r_specular = 1.0;
-    float r_clearcoat = 0.25 * material.clearcoat;
-    float r_sum = r_diffuse + r_specular + r_clearcoat;
+    // float r_refraction = (1.0 - material.transmission);
+    float r_refraction = (1.0 - fresnel) * (1.0 - material.metallic) * material.transmission;
+    // float r_clearcoat = 0.25 * material.clearcoat;
+    float r_clearcoat = 0.25 * material.clearcoat * (1.0 - material.metallic);
+    float r_sum = r_diffuse + r_specular + r_clearcoat + r_refraction;
 
     // 根据辐射度计算选择某种采样方式的概率
     float p_diffuse = r_diffuse / r_sum;
     float p_specular = r_specular / r_sum;
     float p_clearcoat = r_clearcoat / r_sum;
+    float p_refraction = r_refraction / r_sum;
 
     // 根据概率混合 pdf
-    float pdf = p_diffuse * pdf_diffuse
-    + p_specular  * pdf_specular
-    + p_clearcoat * pdf_clearcoat;
+    float pdf = p_diffuse * pdf_diffuse + p_specular * pdf_specular + p_clearcoat * pdf_clearcoat + p_refraction * pdf_refraction;
 
     pdf = max(1e-10, pdf);
     return pdf;
@@ -1260,26 +1368,36 @@ vec3 shadingImportanceSampling(HitRecord hit) {
         hdrTestRay.direction = SampleHdr(rand(), rand());
 
         // 进行一次求交测试 判断是否有遮挡
-        if(dot(N, hdrTestRay.direction) > 0.0) { // 如果采样方向背向点 p 则放弃测试, 因为 N dot L < 0
-            HitRecord hdrHit = hitBVH(hdrTestRay);
-
-            // 天空光仅在没有遮挡的情况下积累亮度
-            if(!hdrHit.isHit) {
-                // 获取采样方向 L 上的: 1.光照贡献, 2.环境贴图在该位置的 pdf, 3.BRDF 函数值, 4.BRDF 在该方向的 pdf
-                vec3 L = hdrTestRay.direction;
-                vec3 skyColor = hdrColor(L);
-                float pdf_light = hdrPdf(L, hdrResolution);
-                vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
-                float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
-
-                // 多重重要性采样
-              float mis_weight = misMixWeight(pdf_light, pdf_brdf);
-              Lo += mis_weight * history * skyColor * f_r * dot(N, L) / pdf_light;
-
-                // 光源重要性采样
-//                Lo += history * skyColor * f_r * dot(N, L) / pdf_light;
-            }
-        }
+//        if(dot(N, hdrTestRay.direction) > 0.0) { // 如果采样方向背向点 p 则放弃测试, 因为 N dot L < 0
+//            HitRecord hdrHit = hitBVH(hdrTestRay);
+//
+//            // 天空光仅在没有遮挡的情况下积累亮度
+//            if(!hdrHit.isHit) {
+//                // 获取采样方向 L 上的: 1.光照贡献, 2.环境贴图在该位置的 pdf, 3.BRDF 函数值, 4.BRDF 在该方向的 pdf
+//                vec3 L = hdrTestRay.direction;
+//                vec3 skyColor = hdrColor(L);
+//                float pdf_light = hdrPdf(L, hdrResolution);
+//                vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
+//                float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+//
+//                // 多重重要性采样
+//                float mis_weight = misMixWeight(pdf_light, pdf_brdf);
+////                 Lo += vec3(0.0, 0.0, 1.0);
+//                Lo += mis_weight * history * skyColor * f_r * dot(N, L) / pdf_light;
+//
+//                // 光源重要性采样
+//                // Lo += history * skyColor * f_r * dot(N, L) / pdf_light;
+//            }
+//            else {
+////                Lo += vec3(0.0, 1.0, 0.0);
+//            }
+//        }
+//        else {
+////            vec3 L = hdrTestRay.direction;
+////            vec3 skyColor = SampleHdr(L);
+////            Lo += skyColor * history * -dot(N, L);
+////            Lo += vec3(1.0, 0.0, 0.0);
+//        }
 
         // 获取 3 个随机数
         vec2 uv = sobolVec2(camera.loopNum + 1, i);
@@ -1291,11 +1409,16 @@ vec3 shadingImportanceSampling(HitRecord hit) {
         // 采样 BRDF 得到一个方向 L
         vec3 L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
         float NdotL = dot(N, L);
-        if(NdotL <= 0.0) break;
+//        if(NdotL <= 0.0) break; TODO continue
+//        if(NdotL <= 0.0) return Lo = vec3(0.0, 0.0, 1.0);
 
         // 获取 L 方向上的 BRDF 值和概率密度
         vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
         float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+//        if(pdf_brdf <= 0.0) return Lo += history * vec3(0.0, 0.0, 1.0);
+        if(pdf_brdf <= 0.0) return Lo += history * hdrColor(L);
+
+
         if(pdf_brdf <= 0.0) break;
 
         // 漫反射: 随机发射光线
@@ -1306,6 +1429,7 @@ vec3 shadingImportanceSampling(HitRecord hit) {
 
         // 反弹未命中
         if(!newHit.isHit) {
+//            Lo = vec3(0.0, 0.0, 1.0); break;
             vec3 skyColor = vec3(0);
             if(enableEnvMap){
 //                skyColor = SampleHdr(randomRay.direction);
@@ -1313,27 +1437,27 @@ vec3 shadingImportanceSampling(HitRecord hit) {
                 float pdf_light = hdrPdf(L, hdrResolution);
 
                 // 多重重要性采样
-                float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
-                Lo += mis_weight * history * skyColor * f_r * NdotL / pdf_brdf;
+//                float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
+//                Lo += mis_weight * history * skyColor * f_r * abs(NdotL) / pdf_brdf;
 
                 // BRDF 重要性采样
-//                Lo += history * skyColor * f_r * NdotL / pdf_brdf;
-                break;
+//                Lo += history * vec3(0.0, 0.0, 1.0);
+                Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
             }
             else {
                 skyColor = getDefaultSkyColor(randomRay.direction.y);
+                Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
             }
-            Lo += history * skyColor * f_r * NdotL / pdf_brdf;
             break;
         }
 
-        // 命中光源积累颜色
+        // 命中
         vec3 Le = newHit.material.emissive;
-        Lo += history * Le * f_r * NdotL / pdf_brdf;
+        Lo += history * Le * f_r * abs(NdotL) / pdf_brdf;
 
         // 递归(步进)
         hit = newHit;
-        history *= f_r * NdotL / pdf_brdf;  // 累积颜色
+        history *= f_r * abs(NdotL) / pdf_brdf;  // 累积颜色
     }
     return Lo;
 }
