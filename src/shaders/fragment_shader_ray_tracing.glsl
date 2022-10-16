@@ -1456,6 +1456,135 @@ vec3 shadingImportanceSampling(HitRecord hit) {
 }
 
 
+// 路径追踪着色-重要性采样
+// ----------
+vec3 shadingImportanceSamplingDisneyBSDF(HitRecord hit) {
+
+    vec3 Lo = vec3(0);          // radiance
+    vec3 history = vec3(1);
+
+    State state;
+
+    for (int i = 0; i < maxBounce; i++) {
+
+        vec3 V = -hit.viewDir;
+        vec3 N = hit.normal;
+
+        // HDR 环境贴图重要性采样
+        Ray hdrTestRay;
+        hdrTestRay.origin = hit.hitPoint;
+        hdrTestRay.direction = SampleHdr(rand(), rand());
+
+        // 进行一次求交测试 判断是否有遮挡
+        if(dot(N, hdrTestRay.direction) > 0.0) { // 如果采样方向背向点 p 则放弃测试, 因为 N dot L < 0
+            HitRecord hdrHit = hitBVH(hdrTestRay);
+
+            // 天空光仅在没有遮挡的情况下积累亮度
+            if(!hdrHit.isHit) {
+                // 获取采样方向 L 上的: 1.光照贡献, 2.环境贴图在该位置的 pdf, 3.BRDF 函数值, 4.BRDF 在该方向的 pdf
+                vec3 L = hdrTestRay.direction;
+                vec3 skyColor = hdrColor(L);
+                float pdf_light = hdrPdf(L, hdrResolution);
+                vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
+                float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+
+                // 多重重要性采样
+//                float mis_weight = misMixWeight(pdf_light, pdf_brdf);
+//                Lo += mis_weight * history * skyColor * f_r * dot(N, L) / pdf_light;
+
+                // 光源重要性采样
+                 Lo += history * skyColor * f_r * dot(N, L) / pdf_light;
+            }
+        }
+
+        // 获取 3 个随机数
+        vec2 uv = sobolVec2(camera.loopNum + 1, i);
+        uv = CranleyPattersonRotation(uv);
+        float xi_1 = uv.x;
+        float xi_2 = uv.y;
+        float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
+
+        state.mat = hit.material;
+        state.eta = dot(hit.viewDir, hit.normal) < 0.0 ? (1.0 / hit.material.IOR) : hit.material.IOR;
+        state.ffnormal = hit.normal; // 已经在 hitTrianlge 中翻转过了
+
+        vec3 L;     // 出射方向
+        float pdf_brdf;  // 出射方向的概率密度
+
+        vec3 f_r = DisneySample(state, -hit.viewDir, hit.normal, L, pdf_brdf); // DisneySample(State state, vec3 V, vec3 N, out vec3 L, out float pdf)
+//        vec3 f_r2 = DisneyEval(state, -hit.viewDir, hit.normal, L, pdf_brdf);       // DisneyEval(State state, vec3 V, vec3 N, vec3 L, out float bsdfPdf)
+
+        // 采样 BRDF 得到一个方向 L
+//        vec3 L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
+        float NdotL = dot(N, L);
+        //        if(NdotL <= 0.0) break; TODO continue
+        //        if(NdotL <= 0.0) return Lo = vec3(0.0, 0.0, 1.0);
+
+        // 获取 L 方向上的 BRDF 值和概率密度
+//        vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
+//        float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+
+        //        if(pdf_brdf <= 0.0) return Lo += history * vec3(0.0, 0.0, 1.0);
+        //        if(pdf_brdf <= 0.0) return Lo += history * hdrColor(L);
+        if(pdf_brdf <= 0.0) break;
+
+        // 漫反射: 随机发射光线
+        Ray randomRay;
+        randomRay.origin = hit.hitPoint;
+        randomRay.direction = L;
+        HitRecord newHit = hitBVH(randomRay);
+
+        // 反弹未命中
+        if(!newHit.isHit) {
+            //            Lo = vec3(0.0, 0.0, 1.0); break;
+            vec3 skyColor = vec3(0);
+            if(enableEnvMap){
+                //                skyColor = SampleHdr(randomRay.direction);
+                skyColor = hdrColor(L);
+                float pdf_light = hdrPdf(L, hdrResolution);
+
+                // 多重重要性采样
+//                float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
+//                Lo += mis_weight * history * skyColor * f_r * abs(NdotL) / pdf_brdf;
+//                Lo += mis_weight * history * skyColor * f_r / pdf_brdf;
+
+                // BRDF 重要性采样
+                //                Lo += history * vec3(0.0, 0.0, 1.0);
+//                                Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
+                Lo += history * skyColor * f_r / pdf_brdf;
+            }
+            else {
+                skyColor = getDefaultSkyColor(randomRay.direction.y);
+//                Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
+                Lo += history * skyColor * f_r / pdf_brdf;
+            }
+            break;
+        }
+
+        // 命中
+        vec3 Le = newHit.material.emissive;
+//        Lo += history * Le * f_r * abs(NdotL) / pdf_brdf;
+        Lo += history * Le * f_r / pdf_brdf;
+
+//        // Sample BSDF for color and outgoing direction
+//        scatterSample.f = DisneySample(state, -r.direction, state.ffnormal, scatterSample.L, scatterSample.pdf);
+//        if (scatterSample.pdf > 0.0)
+//        throughput *= scatterSample.f / scatterSample.pdf;
+//        else
+//        break;
+
+//        // Move ray origin to hit point and set direction for next bounce
+//        r.direction = scatterSample.L;
+//        r.origin = state.fhp + r.direction * EPS;
+
+        // 递归(步进)
+        hit = newHit;
+//        history *= f_r * abs(NdotL) / pdf_brdf;  // 累积颜色
+        history *= f_r / pdf_brdf;  // 累积颜色
+    }
+    return Lo;
+}
+
 void main() {
 
     wseed = uint(randOrigin * float(6.95857) * (TexCoords.x * TexCoords.y));
@@ -1483,6 +1612,7 @@ void main() {
             vec3 Li = vec3(0);
             if(enableImportantSample) {
                 Li = shadingImportanceSampling(firstHit);
+//                Li = shadingImportanceSamplingDisneyBSDF(firstHit);
             }
             else {
                 Li = shading(firstHit);
