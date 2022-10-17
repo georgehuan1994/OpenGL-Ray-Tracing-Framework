@@ -1,22 +1,37 @@
 # OpenGL Ray Tracing Framework
 
-After CPU RayTracing and LearnOpenGL, is time to move a step, Ray-Tracing by GLSL
+![screenshot_bunny.png](https://raw.githubusercontent.com/georgehuan1994/OpenGL-Ray-Tracing-Framework/main/screenshot/screenshot_bunny.png)
 
-## Support
-
-- Disney BRDF
+After [《Ray Tracing in One Weekend Book Series》](https://github.com/RayTracing/raytracing.github.io) and [《LearnOpenGL》](https://github.com/JoeyDeVries/LearnOpenGL), is time to make ray-tracing in GLSL.
 
 ## Reference
 ### third party
 
------------------------ | ------------------------------------------
-Mesh Loading            | [assimp](https://github.com/assimp/assimp)
-Physics                 | [bullet](https://github.com/bulletphysics/bullet3)
-OpenGL Function Loader  | [glad](https://github.com/Dav1dde/glad)
-Windowing and Input     | [glfw](https://github.com/glfw/glfw)
-OpenGL Mathematics      | [glm](https://github.com/g-truc/glm)
-Texture Loading         | [stb](https://github.com/nothings/stb)
-HDR Image Reader        | [hdrloader](https://www.flipcode.com/archives/HDR_Image_Reader.shtml)
+| Functionality            | Library                                                      |
+| ------------------------ | ------------------------------------------------------------ |
+| Mesh Loading             | [assimp](https://github.com/assimp/assimp)                   |
+| OpenGL Function Loader   | [glad](https://github.com/Dav1dde/glad)                      |
+| Windowing and Input      | [glfw](https://github.com/glfw/glfw)                         |
+| OpenGL Mathematics       | [glm](https://github.com/g-truc/glm)                         |
+| Texture Loading          | [stb](https://github.com/nothings/stb)                       |
+| HDR Image Reader         | [hdrloader](https://www.flipcode.com/archives/HDR_Image_Reader.shtml) |
+| Graphical User Interface | [imgui](https://github.com/ocornut/imgui)                    |
 
 ### artcles
+
 [Physically Based Shading at Disney](https://media.disneyanimation.com/uploads/production/publication_asset/48/asset/s2012_pbs_disney_brdf_notes_v3.pdf)
+
+[Physically Based Rendering: From Theory to Implementation](https://www.pbr-book.org/3ed-2018/contents)
+
+### repo
+
+[AKGWSB/EzRT: Easy Ray Tracing, a lite renderer and tutorial from theory to implement, with OpenGL](https://github.com/AKGWSB/EzRT)
+
+[GitHub - knightcrawler25/GLSL-PathTracer: A GLSL Path Tracer](https://github.com/knightcrawler25/GLSL-PathTracer)
+
+## TODO
+
+- Disney BSDF and important sampling
+- Texture
+- Object / Material / Scene manager
+- Gizmo
