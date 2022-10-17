@@ -156,9 +156,9 @@ int main() {
     Material current_material = jade;
     SetGlobalMaterialProperty(current_material);
 
-    Model floor("../../resources/objects/floor.obj");
-    getTriangle(floor.meshes, triangles, plane,
-                getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
+    // Model floor("../../resources/objects/floor.obj");
+    // getTriangle(floor.meshes, triangles, plane,
+    //             getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
 
     Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
     getTriangle(bunny.meshes, triangles, current_material,
