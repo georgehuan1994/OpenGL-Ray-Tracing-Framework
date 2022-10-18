@@ -1571,7 +1571,7 @@ float hdrPdf(vec3 L, int hdrResolution) {
     float sin_theta = max(sin(theta), 1e-10);
 
     // 球坐标和图片积分域的转换系数
-    float p_convert = float(hdrResolution * hdrResolution) / (TWO_PI * PI * sin_theta);
+    float p_convert = float(hdrResolution * hdrResolution / 2) / (TWO_PI * PI * sin_theta);
 
     return pdf * p_convert;
 }
