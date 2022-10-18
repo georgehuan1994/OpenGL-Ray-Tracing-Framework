@@ -156,13 +156,17 @@ int main() {
     Material current_material = jade;
     SetGlobalMaterialProperty(current_material);
 
-    // Model floor("../../resources/objects/floor.obj");
-    // getTriangle(floor.meshes, triangles, plane,
-    //             getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
+    Model floor("../../resources/objects/floor.obj");
+    getTriangle(floor.meshes, triangles, plane,
+                getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
 
     Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
     getTriangle(bunny.meshes, triangles, current_material,
                 getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
+
+    // Model sphere("../../resources/objects/sphere2.obj");
+    // getTriangle(sphere.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0), vec3(2.2, 0, 3), vec3(2)), true);
 
     // Model loong("../../resources/objects/loong.obj");        // 100000 face
     // getTriangle(loong.meshes, triangles, current_material,
@@ -286,6 +290,7 @@ int main() {
     bool enableEnvMap = true;
     bool enableToneMapping = true;
     bool enableGammaCorrection = true;
+    bool enableBSDF = false;
     int maxBounce = 4;
     int maxIterations = 1000;
     for (int i = 0; i < 3; ++i) {
@@ -360,6 +365,9 @@ int main() {
             SaveFrame("../../screenshot/screenshot_bunny_" + to_string(camera.LoopNum) + "_spp.png", width, height);
         }
         ImGui::Separator();
+        if (ImGui::Checkbox("Enable BSDF Properties", &enableBSDF)) {
+            camera.LoopNum = 0;
+        }
         if (ImGui::ColorEdit4("Base Color", baseColor)) {
             current_material.baseColor = vec3(baseColor[0], baseColor[1], baseColor[2]);
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
