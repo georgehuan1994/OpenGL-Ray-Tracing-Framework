@@ -31,8 +31,7 @@ struct Triangle_encoded {
     glm::vec3 param4;        // (clearcoatGloss, IOR, transmission)
 };
 
-void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Material material, mat4 trans,
-                 bool smoothNormal) {
+void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Material material, mat4 trans, bool smoothNormal) {
     // 顶点位置，索引
     std::vector<vec3> vertices;
     std::vector<vec3> normals;
@@ -112,7 +111,7 @@ void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Mate
 
 void RefreshTriangleMaterial(vector<Triangle> &triangles, vector<Triangle_encoded> &triangles_encoded, Material m, GLuint tbo, GLuint textureBuffer) {
     int n = triangles.size();
-    for (int i = 0; i < n; ++i) {
+    for (int i = 0; i < n; i++) {
         Triangle &t = triangles[i];
         t.material = m;
         triangles_encoded[i].emissive = m.emissive;

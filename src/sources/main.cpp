@@ -481,6 +481,7 @@ int main() {
             RayTracerShader.setBool("enableEnvMap", enableEnvMap);
             RayTracerShader.setInt("maxBounce", maxBounce);
             RayTracerShader.setInt("maxIterations", maxIterations);
+            RayTracerShader.setBool("enableBSDF", enableBSDF);
             screen.DrawScreen();
         }
 

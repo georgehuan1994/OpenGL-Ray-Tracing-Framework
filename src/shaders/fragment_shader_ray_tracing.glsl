@@ -1,5 +1,7 @@
 #version 330 core
 
+// ============== define ===============
+
 #define PI              3.14159265358979323
 #define INV_PI          0.31830988618379067
 #define TWO_PI          6.28318530717958648
@@ -11,50 +13,28 @@
 #define SIZE_TRIANGLE   12
 #define SIZE_BVHNODE    4
 
-in vec2 TexCoords;
-out vec4 FragColor;
+// ============== struct ===============
 
-uniform int screenWidth;
-uniform int screenHeight;
-uniform int hdrResolution;
-
-uniform sampler2D historyTexture;
-uniform sampler2D hdrMap;
-uniform sampler2D hdrCache;
-uniform samplerBuffer triangles;
-uniform int nTriangles;
-
-uniform samplerBuffer nodes;
-uniform int nNodes;
-
-uniform float randOrigin;
-
-uniform bool enableImportantSample;
-uniform bool enableEnvMap;
-uniform int maxBounce;
-uniform int maxIterations;
-uniform bool enableBSDF;
-
-// 三角面参数
-// --------
+// triangle data
+// -------------
 struct Triangle {
-    vec3 p1, p2, p3;
-    vec3 n1, n2, n3;
+    vec3 p1, p2, p3;    // position
+    vec3 n1, n2, n3;    // position normal
 };
 
 
-// BVH 树节点
+// BVH node
 // ---------
 struct BVHNode {
-    int left;           // 左子树
-    int right;          // 右子树
-    int n;              // 包含三角形数目
-    int index;          // 三角形索引
-    vec3 AA, BB;        // 碰撞盒
+    int left;           // left child tree
+    int right;          // right child tree
+    int n;              // triangle count
+    int index;          // triangle index
+    vec3 AA, BB;        // AABB Min and Max position
 };
 
-// 材质参数
-// -------
+// material params
+// ---------------
 struct Material {
     vec3 emissive;
     vec3 baseColor;
@@ -72,11 +52,10 @@ struct Material {
     float transmission;     // specTrans
     float ax;
     float ay;
-    float flatness;
 };
 
-// 相机参数，用于构建射线方向
-// ---------------------
+// camera params
+// -------------
 struct Camera {
     vec3 position;
     vec3 front;
@@ -87,33 +66,62 @@ struct Camera {
     vec3 leftBottomCorner;
     int loopNum;
 };
-uniform Camera camera;
 
-// 射线参数
-// -------
+// ray params
+// ----------
 struct Ray {
     vec3 origin;
     vec3 direction;
 };
 
-// 碰撞信息
-// -------
+// hit info
+// --------
 struct HitRecord {
-    bool isHit;             // 是否命中
-    bool isInside;          // 是否从内部命中
-    float distance;         // 射线距离
-    vec3 hitPoint;          // 命中点
-    vec3 normal;            // 法线
-    vec3 viewDir;           // 视线
-    Material material;      // 材质
+    bool isHit;
+    bool isInside;
+    float distance;
+    vec3 hitPoint;
+    vec3 normal;            // hit point normal
+    vec3 viewDir;
+    Material material;
 };
+
+// ============== uniform ===============
+
+in vec2 TexCoords;
+out vec4 FragColor;
+
+uniform Camera camera;
+
+uniform int screenWidth;
+uniform int screenHeight;
+uniform int hdrResolution;
+
+uniform sampler2D historyTexture;
+uniform sampler2D hdrMap;
+uniform sampler2D hdrCache;         // R:u, G:v, B:pdf(u, v)
+uniform samplerBuffer triangles;    // triangle data
+uniform int nTriangles;
+
+uniform samplerBuffer nodes;        // bvh data
+uniform int nNodes;
+
+uniform float randOrigin;
+
+uniform bool enableImportantSample;
+uniform bool enableEnvMap;
+uniform bool enableBSDF;
+uniform int maxBounce;
+uniform int maxIterations;
+
+// ============== function ===============
 
 float sqr(float x) { return x*x; }
 
 uint wseed;
 
-// 随机种
-// -----
+// Thomas Wang hash
+// ----------------
 float randcore(uint seed) {
     seed = (seed ^ uint(61)) ^ (seed >> uint(16));
     seed *= uint(9);
@@ -123,35 +131,39 @@ float randcore(uint seed) {
     return float(wseed) * (1.0 / 4294967296.0);
 }
 
-// 随机数生成
-// --------
 float rand() { return randcore(wseed); }
 
-// 1 ~ 8 维的 sobol 生成矩阵
-const int V[8*32] = int[8*32](
-2147483648, 1073741824, 536870912, 268435456, 134217728, 67108864, 33554432, 16777216, 8388608, 4194304, 2097152, 1048576, 524288, 262144, 131072, 65536, 32768, 16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 2147483648, 3221225472, 2684354560, 4026531840, 2281701376, 3422552064, 2852126720, 4278190080, 2155872256, 3233808384, 2694840320, 4042260480, 2290614272, 3435921408, 2863267840, 4294901760, 2147516416, 3221274624, 2684395520, 4026593280, 2281736192, 3422604288, 2852170240, 4278255360, 2155905152, 3233857728, 2694881440, 4042322160, 2290649224, 3435973836, 2863311530, 4294967295, 2147483648, 3221225472, 1610612736, 2415919104, 3892314112, 1543503872, 2382364672, 3305111552, 1753219072, 2629828608, 3999268864, 1435500544, 2154299392, 3231449088, 1626210304, 2421489664, 3900735488, 1556135936, 2388680704, 3314585600, 1751705600, 2627492864, 4008611328, 1431684352, 2147543168, 3221249216, 1610649184, 2415969680, 3892340840, 1543543964, 2382425838, 3305133397, 2147483648, 3221225472, 536870912, 1342177280, 4160749568, 1946157056, 2717908992, 2466250752, 3632267264, 624951296, 1507852288, 3872391168, 2013790208, 3020685312, 2181169152, 3271884800, 546275328, 1363623936, 4226424832, 1977167872, 2693105664, 2437829632, 3689389568, 635137280, 1484783744, 3846176960, 2044723232, 3067084880, 2148008184, 3222012020, 537002146, 1342505107, 2147483648, 1073741824, 536870912, 2952790016, 4160749568, 3690987520, 2046820352, 2634022912, 1518338048, 801112064, 2707423232, 4038066176, 3666345984, 1875116032, 2170683392, 1085997056, 579305472, 3016343552, 4217741312, 3719483392, 2013407232, 2617981952, 1510979072, 755882752, 2726789248, 4090085440, 3680870432, 1840435376, 2147625208, 1074478300, 537900666, 2953698205, 2147483648, 1073741824, 1610612736, 805306368, 2818572288, 335544320, 2113929216, 3472883712, 2290089984, 3829399552, 3059744768, 1127219200, 3089629184, 4199809024, 3567124480, 1891565568, 394297344, 3988799488, 920674304, 4193267712, 2950604800, 3977188352, 3250028032, 129093376, 2231568512, 2963678272, 4281226848, 432124720, 803643432, 1633613396, 2672665246, 3170194367, 2147483648, 3221225472, 2684354560, 3489660928, 1476395008, 2483027968, 1040187392, 3808428032, 3196059648, 599785472, 505413632, 4077912064, 1182269440, 1736704000, 2017853440, 2221342720, 3329785856, 2810494976, 3628507136, 1416089600, 2658719744, 864310272, 3863387648, 3076993792, 553150080, 272922560, 4167467040, 1148698640, 1719673080, 2009075780, 2149644390, 3222291575, 2147483648, 1073741824, 2684354560, 1342177280, 2281701376, 1946157056, 436207616, 2566914048, 2625634304, 3208642560, 2720006144, 2098200576, 111673344, 2354315264, 3464626176, 4027383808, 2886631424, 3770826752, 1691164672, 3357462528, 1993345024, 3752330240, 873073152, 2870150400, 1700563072, 87021376, 1097028000, 1222351248, 1560027592, 2977959924, 23268898, 437609937
-);
-//const uint V[8*32] = uint[8*32](
-//2147483648u,1073741824u,536870912u,268435456u,134217728u,67108864u,33554432u,16777216u,8388608u,4194304u,2097152u,1048576u,524288u,262144u,131072u,65536u,32768u,16384u,8192u,4096u,2048u,1024u,512u,256u,128u,64u,32u,16u,8u,4u,2u,1u,2147483648u,3221225472u,2684354560u,4026531840u,2281701376u,3422552064u,2852126720u,4278190080u,2155872256u,3233808384u,2694840320u,4042260480u,2290614272u,3435921408u,2863267840u,4294901760u,2147516416u,3221274624u,2684395520u,4026593280u,2281736192u,3422604288u,2852170240u,4278255360u,2155905152u,3233857728u,2694881440u,4042322160u,2290649224u,3435973836u,2863311530u,4294967295u,2147483648u,3221225472u,1610612736u,2415919104u,3892314112u,1543503872u,2382364672u,3305111552u,1753219072u,2629828608u,3999268864u,1435500544u,2154299392u,3231449088u,1626210304u,2421489664u,3900735488u,1556135936u,2388680704u,3314585600u,1751705600u,2627492864u,4008611328u,1431684352u,2147543168u,3221249216u,1610649184u,2415969680u,3892340840u,1543543964u,2382425838u,3305133397u,2147483648u,3221225472u,536870912u,1342177280u,4160749568u,1946157056u,2717908992u,2466250752u,3632267264u,624951296u,1507852288u,3872391168u,2013790208u,3020685312u,2181169152u,3271884800u,546275328u,1363623936u,4226424832u,1977167872u,2693105664u,2437829632u,3689389568u,635137280u,1484783744u,3846176960u,2044723232u,3067084880u,2148008184u,3222012020u,537002146u,1342505107u,2147483648u,1073741824u,536870912u,2952790016u,4160749568u,3690987520u,2046820352u,2634022912u,1518338048u,801112064u,2707423232u,4038066176u,3666345984u,1875116032u,2170683392u,1085997056u,579305472u,3016343552u,4217741312u,3719483392u,2013407232u,2617981952u,1510979072u,755882752u,2726789248u,4090085440u,3680870432u,1840435376u,2147625208u,1074478300u,537900666u,2953698205u,2147483648u,1073741824u,1610612736u,805306368u,2818572288u,335544320u,2113929216u,3472883712u,2290089984u,3829399552u,3059744768u,1127219200u,3089629184u,4199809024u,3567124480u,1891565568u,394297344u,3988799488u,920674304u,4193267712u,2950604800u,3977188352u,3250028032u,129093376u,2231568512u,2963678272u,4281226848u,432124720u,803643432u,1633613396u,2672665246u,3170194367u,2147483648u,3221225472u,2684354560u,3489660928u,1476395008u,2483027968u,1040187392u,3808428032u,3196059648u,599785472u,505413632u,4077912064u,1182269440u,1736704000u,2017853440u,2221342720u,3329785856u,2810494976u,3628507136u,1416089600u,2658719744u,864310272u,3863387648u,3076993792u,553150080u,272922560u,4167467040u,1148698640u,1719673080u,2009075780u,2149644390u,3222291575u,2147483648u,1073741824u,2684354560u,1342177280u,2281701376u,1946157056u,436207616u,2566914048u,2625634304u,3208642560u,2720006144u,2098200576u,111673344u,2354315264u,3464626176u,4027383808u,2886631424u,3770826752u,1691164672u,3357462528u,1993345024u,3752330240u,873073152u,2870150400u,1700563072u,87021376u,1097028000u,1222351248u,1560027592u,2977959924u,23268898u,437609937u
-//);
 
-// 格林码
+// 1 ~ 8 dimensional sobol matrix
+// https://wiki.blender.org/wiki/Source/Render/Cycles/SamplingPatterns
+// ------------------------------
+//const int V[8*32] = int[8*32](
+//2147483648, 1073741824, 536870912, 268435456, 134217728, 67108864, 33554432, 16777216, 8388608, 4194304, 2097152, 1048576, 524288, 262144, 131072, 65536, 32768, 16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 2147483648, 3221225472, 2684354560, 4026531840, 2281701376, 3422552064, 2852126720, 4278190080, 2155872256, 3233808384, 2694840320, 4042260480, 2290614272, 3435921408, 2863267840, 4294901760, 2147516416, 3221274624, 2684395520, 4026593280, 2281736192, 3422604288, 2852170240, 4278255360, 2155905152, 3233857728, 2694881440, 4042322160, 2290649224, 3435973836, 2863311530, 4294967295, 2147483648, 3221225472, 1610612736, 2415919104, 3892314112, 1543503872, 2382364672, 3305111552, 1753219072, 2629828608, 3999268864, 1435500544, 2154299392, 3231449088, 1626210304, 2421489664, 3900735488, 1556135936, 2388680704, 3314585600, 1751705600, 2627492864, 4008611328, 1431684352, 2147543168, 3221249216, 1610649184, 2415969680, 3892340840, 1543543964, 2382425838, 3305133397, 2147483648, 3221225472, 536870912, 1342177280, 4160749568, 1946157056, 2717908992, 2466250752, 3632267264, 624951296, 1507852288, 3872391168, 2013790208, 3020685312, 2181169152, 3271884800, 546275328, 1363623936, 4226424832, 1977167872, 2693105664, 2437829632, 3689389568, 635137280, 1484783744, 3846176960, 2044723232, 3067084880, 2148008184, 3222012020, 537002146, 1342505107, 2147483648, 1073741824, 536870912, 2952790016, 4160749568, 3690987520, 2046820352, 2634022912, 1518338048, 801112064, 2707423232, 4038066176, 3666345984, 1875116032, 2170683392, 1085997056, 579305472, 3016343552, 4217741312, 3719483392, 2013407232, 2617981952, 1510979072, 755882752, 2726789248, 4090085440, 3680870432, 1840435376, 2147625208, 1074478300, 537900666, 2953698205, 2147483648, 1073741824, 1610612736, 805306368, 2818572288, 335544320, 2113929216, 3472883712, 2290089984, 3829399552, 3059744768, 1127219200, 3089629184, 4199809024, 3567124480, 1891565568, 394297344, 3988799488, 920674304, 4193267712, 2950604800, 3977188352, 3250028032, 129093376, 2231568512, 2963678272, 4281226848, 432124720, 803643432, 1633613396, 2672665246, 3170194367, 2147483648, 3221225472, 2684354560, 3489660928, 1476395008, 2483027968, 1040187392, 3808428032, 3196059648, 599785472, 505413632, 4077912064, 1182269440, 1736704000, 2017853440, 2221342720, 3329785856, 2810494976, 3628507136, 1416089600, 2658719744, 864310272, 3863387648, 3076993792, 553150080, 272922560, 4167467040, 1148698640, 1719673080, 2009075780, 2149644390, 3222291575, 2147483648, 1073741824, 2684354560, 1342177280, 2281701376, 1946157056, 436207616, 2566914048, 2625634304, 3208642560, 2720006144, 2098200576, 111673344, 2354315264, 3464626176, 4027383808, 2886631424, 3770826752, 1691164672, 3357462528, 1993345024, 3752330240, 873073152, 2870150400, 1700563072, 87021376, 1097028000, 1222351248, 1560027592, 2977959924, 23268898, 437609937
+//);
+const uint V[8*32] = uint[8*32](
+2147483648u, 1073741824u, 536870912u, 268435456u, 134217728u, 67108864u, 33554432u, 16777216u, 8388608u, 4194304u, 2097152u, 1048576u, 524288u, 262144u, 131072u, 65536u, 32768u, 16384u, 8192u, 4096u, 2048u, 1024u, 512u, 256u, 128u, 64u, 32u, 16u, 8u, 4u, 2u, 1u, 2147483648u, 3221225472u, 2684354560u, 4026531840u, 2281701376u, 3422552064u, 2852126720u, 4278190080u, 2155872256u, 3233808384u, 2694840320u, 4042260480u, 2290614272u, 3435921408u, 2863267840u, 4294901760u, 2147516416u, 3221274624u, 2684395520u, 4026593280u, 2281736192u, 3422604288u, 2852170240u, 4278255360u, 2155905152u, 3233857728u, 2694881440u, 4042322160u, 2290649224u, 3435973836u, 2863311530u, 4294967295u, 2147483648u, 3221225472u, 1610612736u, 2415919104u, 3892314112u, 1543503872u, 2382364672u, 3305111552u, 1753219072u, 2629828608u, 3999268864u, 1435500544u, 2154299392u, 3231449088u, 1626210304u, 2421489664u, 3900735488u, 1556135936u, 2388680704u, 3314585600u, 1751705600u, 2627492864u, 4008611328u, 1431684352u, 2147543168u, 3221249216u, 1610649184u, 2415969680u, 3892340840u, 1543543964u, 2382425838u, 3305133397u, 2147483648u, 3221225472u, 536870912u, 1342177280u, 4160749568u, 1946157056u, 2717908992u, 2466250752u, 3632267264u, 624951296u, 1507852288u, 3872391168u, 2013790208u, 3020685312u, 2181169152u, 3271884800u, 546275328u, 1363623936u, 4226424832u, 1977167872u, 2693105664u, 2437829632u, 3689389568u, 635137280u, 1484783744u, 3846176960u, 2044723232u, 3067084880u, 2148008184u, 3222012020u, 537002146u, 1342505107u, 2147483648u, 1073741824u, 536870912u, 2952790016u, 4160749568u, 3690987520u, 2046820352u, 2634022912u, 1518338048u, 801112064u, 2707423232u, 4038066176u, 3666345984u, 1875116032u, 2170683392u, 1085997056u, 579305472u, 3016343552u, 4217741312u, 3719483392u, 2013407232u, 2617981952u, 1510979072u, 755882752u, 2726789248u, 4090085440u, 3680870432u, 1840435376u, 2147625208u, 1074478300u, 537900666u, 2953698205u, 2147483648u, 1073741824u, 1610612736u, 805306368u, 2818572288u, 335544320u, 2113929216u, 3472883712u, 2290089984u, 3829399552u, 3059744768u, 1127219200u, 3089629184u, 4199809024u, 3567124480u, 1891565568u, 394297344u, 3988799488u, 920674304u, 4193267712u, 2950604800u, 3977188352u, 3250028032u, 129093376u, 2231568512u, 2963678272u, 4281226848u, 432124720u, 803643432u, 1633613396u, 2672665246u, 3170194367u, 2147483648u, 3221225472u, 2684354560u, 3489660928u, 1476395008u, 2483027968u, 1040187392u, 3808428032u, 3196059648u, 599785472u, 505413632u, 4077912064u, 1182269440u, 1736704000u, 2017853440u, 2221342720u, 3329785856u, 2810494976u, 3628507136u, 1416089600u, 2658719744u, 864310272u, 3863387648u, 3076993792u, 553150080u, 272922560u, 4167467040u, 1148698640u, 1719673080u, 2009075780u, 2149644390u, 3222291575u, 2147483648u, 1073741824u, 2684354560u, 1342177280u, 2281701376u, 1946157056u, 436207616u, 2566914048u, 2625634304u, 3208642560u, 2720006144u, 2098200576u, 111673344u, 2354315264u, 3464626176u, 4027383808u, 2886631424u, 3770826752u, 1691164672u, 3357462528u, 1993345024u, 3752330240u, 873073152u, 2870150400u, 1700563072u, 87021376u, 1097028000u, 1222351248u, 1560027592u, 2977959924u, 23268898u, 437609937u
+);
+
+
 int grayCode(int i) {
     return i ^ (i>>1);
 }
 
-// 生成第 d 维度的第 i 个 sobol 数
+// Generate d Dimensional, i Sobol Number
+// --------------------------------------
 float sobol(int d, int i) {
-    int result = 0;
+    uint result = 0u;
     int offset = d * 32;
-    for(int j = 0; i != 0; i >>= 1, j++)
-    if((i & 1) != 0)
+    for (int j = 0; i != 0; i >>= 1, j++)
+    if ((i & 1) != 0)
     result ^= V[j+offset];
 
-    return float(result) * (1.0f/float(0xFFFFFFFFU));
+    return float(result) * (1.0f / float(0xFFFFFFFFU));
 }
 
 // 生成第 i 帧的第 b 次反弹需要的二维随机向量
+// generate random vec2 for the b-th bounce of the i frame
+// -------------------------------------------------------
 vec2 sobolVec2(int i, int b) {
     float u = sobol(b * 2, grayCode(i));
     float v = sobol(b * 2 + 1, grayCode(i));
@@ -165,8 +177,8 @@ float Luminance(vec3 c)
     return 0.212671 * c.x + 0.715160 * c.y + 0.072169 * c.z;
 }
 
-// 获取第 i 下标的三角形
-// ------------------
+// Get triangle with index i
+// -------------------------
 Triangle getTriangle(int i) {
 
     // vec3 -> 12 字节对齐
@@ -185,14 +197,14 @@ Triangle getTriangle(int i) {
     return t;
 }
 
-// 获取第 i 个下标的三角形法线
-// -----------------------
+// Get triangle normal
+// -------------------
 vec3 getTriangleNormal(Triangle trian) {
-    return normalize(cross(trian.p3-trian.p1, trian.p2-trian.p1));
+    return normalize(cross(trian.p3 - trian.p1, trian.p2 - trian.p1));
 }
 
-// 获取第 i 下标的三角形的材质
-// -----------------------
+// Get triangle material with index i
+// ----------------------------------
 Material getMaterial(int i) {
 
     Material m;
@@ -225,7 +237,7 @@ Material getMaterial(int i) {
     return m;
 }
 
-// 获取第 i 下标的 BVHNode 对象
+// Get bvh node with index i
 // -------------------------
 BVHNode getBVHNode(int i) {
     BVHNode node;
@@ -498,7 +510,18 @@ float GTR2(float NdotH, float a) {
 }
 
 float GTR2Aniso(float NdotH, float HdotX, float HdotY, float ax, float ay) {
+    float a = HdotX / ax;
+    float b = HdotY / ay;
+    float c = a * a + b * b + NdotH * NdotH;
+    return 1.0 / (PI * ax * ay * c * c);
     return 1 / (PI * ax*ay * sqr( sqr(HdotX/ax) + sqr(HdotY/ay) + NdotH*NdotH ));
+}
+
+float SmithG(float NDotV, float alphaG)
+{
+    float a = alphaG * alphaG;
+    float b = NDotV * NDotV;
+    return (2.0 * NDotV) / (NDotV + sqrt(a + b - a * b));
 }
 
 // Geometry
@@ -540,6 +563,14 @@ float SeparableSmithGGXG1(vec3 w, vec3 wm, float ax, float ay)
 // --------
 float smithG_GGX_aniso(float NdotV, float VdotX, float VdotY, float ax, float ay) {
     return 1 / (NdotV + sqrt( sqr(VdotX*ax) + sqr(VdotY*ay) + sqr(NdotV) ));
+}
+
+float SmithGAniso(float NDotV, float VDotX, float VDotY, float ax, float ay)
+{
+    float a = VDotX * ax;
+    float b = VDotY * ay;
+    float c = NDotV;
+    return (2.0 * NDotV) / (NDotV + sqrt(a * a + b * b + c * c));
 }
 
 float GgxAnisotropicD(vec3 wm, float ax, float ay)
@@ -641,150 +672,11 @@ vec3 DisneyFresnel(Material material, vec3 wo, vec3 wm, vec3 wi)
     return mix(vec3(dielectricFresnel), metallicFresnel, material.metallic);
 }
 
-float ThinTransmissionRoughness(float ior, float roughness)
+float DisneyFresnel(Material mat, float eta, float LDotH, float VDotH)
 {
-    // -- Disney scales by (.65 * eta - .35) based on figure 15 of the 2015 PBR course notes. Based on their figure
-    // -- the results match a geometrically thin solid fairly well.
-    return clamp((0.65 * ior - 0.35) * roughness, 0.0, 1.0);
-}
-
-
-// Evaluate Sheen - Fsheen
-// -----------------------
-vec3 EvaluateSheen(Material material, vec3 wo, vec3 wm, vec3 wi) {
-    if(material.sheen <= 0.0) {
-        return vec3(0);
-    }
-    float dotHL = dot(wm, wi);
-    vec3 tint = CalculateTint(material.baseColor);
-    return material.sheen * mix(vec3(1.0), tint, material.sheenTint) * SchlickFresnel(dotHL);
-}
-
-// Evaluate Clearcoat
-// ------------------
-float EvaluateDisneyClearcoat(float clearcoat, float alpha, vec3 wo, vec3 wm, vec3 wi, out float fPdfW, out float rPdfW)
-{
-    if(clearcoat <= 0.0) {
-        return 0;
-    }
-
-    float absDotNH = AbsCosTheta(wm);
-    float absDotNL = AbsCosTheta(wi);
-    float absDotNV = AbsCosTheta(wo);
-    float dotHL = dot(wm, wi);
-
-    float d = GTR1(absDotNH, mix(0.1, 0.001, alpha));
-    float f = Schlick(0.04, dotHL);
-    float gl = SeparableSmithGGXG1(wi, 0.25);
-    float gv = SeparableSmithGGXG1(wo, 0.25);
-
-    fPdfW = d / (4.0 * absDotNL);
-    rPdfW = d / (4.0 * absDotNV);
-
-    return 0.25 * clearcoat * d * f * gl * gv;
-}
-
-// Evaluate Disney BRDF
-// --------------------
-vec3 EvaluateDisneyBRDF(Material material, vec3 wo, vec3 wm, vec3 wi, out float fPdf, out float rPdf)
-{
-    fPdf = 0.0f;
-    rPdf = 0.0f;
-
-    float dotNL = CosTheta(wi);
-    float dotNV = CosTheta(wo);
-    if(dotNL <= 0.0 || dotNV <= 0.0) {
-        return vec3(0);
-    }
-
-    float ax, ay;
-    CalculateAnisotropicParams(material.roughness, material.anisotropic, ax, ay);
-
-    float d = GgxAnisotropicD(wm, ax, ay);
-    float gl = SeparableSmithGGXG1(wi, wm, ax, ay);
-    float gv = SeparableSmithGGXG1(wo, wm, ax, ay);
-
-    vec3 f = DisneyFresnel(material, wo, wm, wi);
-
-    GgxVndfAnisotropicPdf(wi, wm, wo, ax, ay, fPdf, rPdf);
-    fPdf *= (1.0 / (4 * abs(dot(wo, wm))));
-    rPdf *= (1.0 / (4 * abs(dot(wi, wm))));
-
-    return d * gl * gv * f / (4.0 * dotNL * dotNV);
-}
-
-vec3 EvaluateDisneySpecTransmission(Material material, vec3 wo, vec3 wm, vec3 wi, float ax, float ay, bool thin)
-{
-    float absDotNL = AbsCosTheta(wi);
-    float absDotNV = AbsCosTheta(wo);
-    float dotHL = dot(wm, wi);
-    float dotHV = dot(wm, wo);
-    float absDotHL = abs(dotHL);
-    float absDotHV = abs(dotHV);
-
-    float d = GgxAnisotropicD(wm, ax, ay);
-    float gl = SeparableSmithGGXG1(wi, wm, ax, ay);
-    float gv = SeparableSmithGGXG1(wo, wm, ax, ay);
-
-    float eta = dotHV > 0.0 ? (1.0 / material.IOR) : material.IOR;
-    float n2 = eta * eta;
-
-    float f = DielectricFresnel(dotHV, eta);
-
-    vec3 color;
-    if(thin)
-        color = sqrt(material.baseColor);
-    else
-        color = material.baseColor;
-
-    // Note that we are intentionally leaving out the 1/n2 spreading factor since for VCM we will be evaluating
-    // particles with this. That means we'll need to model the air-[other medium] transmission if we ever place
-    // the camera inside a non-air medium.
-    float c = (absDotHL * absDotHV) / (absDotNL * absDotNV);
-    float t = (n2 / sqr(dotHL + eta * dotHV));
-    return color * c * t * (1.0 - f) * gl * gv * d;
-}
-
-float EvaluateDisneyRetroDiffuse(Material material, vec3 wo, vec3 wm, vec3 wi)
-{
-float dotNL = AbsCosTheta(wi);
-float dotNV = AbsCosTheta(wo);
-
-float roughness = material.roughness * material.roughness;
-
-float rr = 0.5 + 2.0 * dotNL * dotNL * roughness;
-float fl = SchlickFresnel(dotNL);
-float fv = SchlickFresnel(dotNV);
-
-return rr * (fl + fv + fl * fv * (rr - 1.0f));
-}
-
-float EvaluateDisneyDiffuse(Material material, vec3 wo, vec3 wm, vec3 wi, bool thin)
-{
-    float dotNL = AbsCosTheta(wi);
-    float dotNV = AbsCosTheta(wo);
-
-    float fl = SchlickFresnel(dotNL);
-    float fv = SchlickFresnel(dotNV);
-
-    float hanrahanKrueger = 0.0;
-
-    if(thin && material.flatness > 0.0f) {
-        float roughness = material.roughness * material.roughness;
-
-        float dotHL = dot(wm, wi);
-        float fss90 = dotHL * dotHL * roughness;
-        float fss = mix(1.0, fss90, fl) * mix(1.0, fss90, fv);
-
-        float ss = 1.25 * (fss * (1.0 / (dotNL + dotNV) - 0.5) + 0.5);
-        hanrahanKrueger = ss;
-    }
-
-    float lambert = 1;
-    float retro = EvaluateDisneyRetroDiffuse(material, wo, wm, wi);
-    float subsurfaceApprox = mix(lambert, hanrahanKrueger, thin ? material.flatness : 0);
-
-    return INV_PI * (retro + subsurfaceApprox * (1.0 - 0.5 * fl) * (1.0 - 0.5 * fv));
+    float metallicFresnel = SchlickFresnel(LDotH);
+    float dielectricFresnel = DielectricFresnel(abs(VDotH), eta);
+    return mix(dielectricFresnel, metallicFresnel, mat.metallic);
 }
 
 vec3 ToWorld(vec3 X, vec3 Y, vec3 Z, vec3 V)
@@ -797,294 +689,70 @@ vec3 ToLocal(vec3 X, vec3 Y, vec3 Z, vec3 V)
     return vec3(dot(V, X), dot(V, Y), dot(V, Z));
 }
 
+// --------------------------------------------------------------------------
+
+void CalculateBRDFLobePdfs(Material material, out float pDiffuse, out float pSpecular, out float pClearcoat, out float pSpecTrans) {
+
+    // 辐射度统计 weight
+    float r_diffuse = (1.0 - material.metallic) * (1.0 - material.transmission);
+    float r_specular = material.metallic + (1.0 - material.transmission) * (1.0 - material.metallic);
+    float r_clearcoat = 0.25 * material.clearcoat * (1.0 - material.metallic);
+    float r_refraction = (1.0 - material.metallic) * material.transmission;
+
+    float r_sum = r_diffuse + r_specular + r_clearcoat;
+
+     if (enableBSDF) {
+        r_sum += r_refraction;
+     }
+
+    // 根据辐射度计算概率
+    pDiffuse = r_diffuse / r_sum;
+    pSpecular = r_specular / r_sum;
+    pClearcoat = r_clearcoat / r_sum;
+    pSpecTrans = r_refraction / r_sum;
+}
+
+void GetSpecColor(Material mat, float eta, out vec3 specCol, out vec3 sheenCol)
+{
+    float lum = Luminance(mat.baseColor);
+    vec3 ctint = lum > 0.0 ? mat.baseColor / lum : vec3(1.0);
+    float F0 = (1.0 - eta) / (1.0 + eta);
+    specCol = mix(F0 * F0 * mix(vec3(1.0), ctint, mat.specularTint), mat.baseColor, mat.metallic);
+    sheenCol = mix(vec3(1.0), ctint, mat.sheenTint);
+}
+
+void GetLobeProbabilities(Material mat, float eta, vec3 specCol, float approxFresnel, out float diffuseWt, out float specReflectWt, out float specRefractWt, out float clearcoatWt)
+{
+    diffuseWt = Luminance(mat.baseColor) * (1.0 - mat.metallic) * (1.0 - mat.transmission);
+    specReflectWt = Luminance(mix(specCol, vec3(1.0), approxFresnel));
+    specRefractWt = (1.0 - approxFresnel) * (1.0 - mat.metallic) * mat.transmission * Luminance(mat.baseColor);
+    clearcoatWt = 0.25 * mat.clearcoat * (1.0 - mat.metallic);
+    float totalWt = diffuseWt + specReflectWt + specRefractWt + clearcoatWt;
+
+    diffuseWt /= totalWt;
+    specReflectWt /= totalWt;
+    specRefractWt /= totalWt;
+    clearcoatWt /= totalWt;
+}
+
 void CalculateLobePdfs(Material material, out float pSpecular, out float pDiffuse, out float pClearcoat, out float pSpecTrans)
 {
     float metallicBRDF   = material.metallic;
     float specularBSDF   = (1.0 - material.metallic) * material.transmission;
-    float dielectricBRDF = (1.0 - material.transmission) * (1.0f - material.metallic);
+    float dielectricBRDF = (1.0 - material.transmission) * (1.0 - material.metallic);
 
     float specularWeight     = metallicBRDF + dielectricBRDF;
     float transmissionWeight = specularBSDF;
     float diffuseWeight      = dielectricBRDF;
     float clearcoatWeight    = 1.0 * max(0, material.clearcoat);
 
-    float norm = 1.0f / (specularWeight + transmissionWeight + diffuseWeight + clearcoatWeight);
+    float norm = 1.0 / (specularWeight + transmissionWeight + diffuseWeight + clearcoatWeight);
 
     pSpecular  = specularWeight     * norm;
     pSpecTrans = transmissionWeight * norm;
     pDiffuse   = diffuseWeight      * norm;
     pClearcoat = clearcoatWeight    * norm;
 }
-
-vec3 EvaluateDisney(Material material, vec3 v, vec3 n, vec3 l, bool thin, out float forwardPdf, out float reversePdf)
-{
-    vec3 T, B;
-    getTangent(n, T, B);
-
-    vec3 wi = ToLocal(T, B, n, l);
-    vec3 wo = ToLocal(T, B, n, v);
-
-//    vec3 wo = normalize(MatrixMultiply(v, material.worldToTangent));
-//    vec3 wi = normalize(MatrixMultiply(l, material.worldToTangent));
-    vec3 wm = normalize(wo + wi);
-
-    float dotNV = CosTheta(wo);
-    float dotNL = CosTheta(wi);
-
-    vec3 reflectance = vec3(0);
-    forwardPdf = 0;
-    reversePdf = 0;
-
-    float pBRDF, pDiffuse, pClearcoat, pSpecTrans;
-    CalculateLobePdfs(material, pBRDF, pDiffuse, pClearcoat, pSpecTrans);
-
-    vec3 baseColor = material.baseColor;
-    float metallic = material.metallic;
-    float specTrans = material.transmission;
-    float roughness = material.roughness;
-
-    // calculate all of the anisotropic params
-    float ax, ay;
-    CalculateAnisotropicParams(material.roughness, material.anisotropic, ax, ay);
-
-    float diffuseWeight = (1.0 - metallic) * (1.0 - specTrans);
-    float transWeight   = (1.0 - metallic) * specTrans;
-
-    // -- Clearcoat
-    bool upperHemisphere = dotNL > 0.0 && dotNV > 0.0;
-    if(upperHemisphere && material.clearcoat > 0.0) {
-
-        float forwardClearcoatPdfW;
-        float reverseClearcoatPdfW;
-
-        float clearcoat = EvaluateDisneyClearcoat(material.clearcoat, material.clearcoatGloss, wo, wm, wi,
-        forwardClearcoatPdfW, reverseClearcoatPdfW);
-        reflectance += vec3(clearcoat);
-        forwardPdf += pClearcoat * forwardClearcoatPdfW;
-        reversePdf += pClearcoat * reverseClearcoatPdfW;
-    }
-
-    // -- Diffuse
-    if(diffuseWeight > 0.0) {
-        float forwardDiffusePdfW = AbsCosTheta(wi);
-        float reverseDiffusePdfW = AbsCosTheta(wo);
-        float diffuse = EvaluateDisneyDiffuse(material, wo, wm, wi, thin);
-
-        vec3 sheen = EvaluateSheen(material, wo, wm, wi);
-
-        reflectance += diffuseWeight * (diffuse * material.baseColor + sheen);
-
-        forwardPdf += pDiffuse * forwardDiffusePdfW;
-        reversePdf += pDiffuse * reverseDiffusePdfW;
-    }
-
-    // -- transmission
-    if(transWeight > 0.0) {
-
-        // Scale roughness based on IOR (Burley 2015, Figure 15).
-        float rscaled = thin ? ThinTransmissionRoughness(material.IOR, material.roughness) : material.roughness;
-        float tax, tay;
-        CalculateAnisotropicParams(rscaled, material.anisotropic, tax, tay);
-
-        vec3 transmission = EvaluateDisneySpecTransmission(material, wo, wm, wi, tax, tay, thin);
-        reflectance += transWeight * transmission;
-
-        float forwardTransmissivePdfW;
-        float reverseTransmissivePdfW;
-        GgxVndfAnisotropicPdf(wi, wm, wo, tax, tay, forwardTransmissivePdfW, reverseTransmissivePdfW);
-
-    float dotLH = dot(wm, wi);
-    float dotVH = dot(wm, wo);
-    float eta = dot(wm, wo) > 0.0 ? (1.0 / material.IOR) : material.IOR;
-    forwardPdf += pSpecTrans * forwardTransmissivePdfW / (sqr(dotLH + eta * dotVH));
-    reversePdf += pSpecTrans * reverseTransmissivePdfW / (sqr(dotVH + eta * dotLH));
-    }
-
-    // -- specular
-    if(upperHemisphere) {
-        float forwardMetallicPdfW;
-        float reverseMetallicPdfW;
-        vec3 specular = EvaluateDisneyBRDF(material, wo, wm, wi, forwardMetallicPdfW, reverseMetallicPdfW);
-
-        reflectance += specular;
-        forwardPdf += pBRDF * forwardMetallicPdfW / (4 * abs(dot(wo, wm)));
-        reversePdf += pBRDF * reverseMetallicPdfW / (4 * abs(dot(wi, wm)));
-    }
-
-    reflectance = reflectance * abs(dotNL);
-
-    return reflectance;
-}
-
-
-vec3 SampleGgxVndfAnisotropic(vec3 wo, float ax, float ay, float u1, float u2)
-{
-    // -- Stretch the view vector so we are sampling as though roughness==1
-    vec3 v = normalize(vec3(wo.x * ax, wo.y, wo.z * ay));
-
-    // -- Build an orthonormal basis with v, t1, and t2
-    vec3 t1 = (v.y < 0.9999f) ? normalize(cross(v, vec3(0, 1, 0))) : vec3(1, 0, 0);
-    vec3 t2 = cross(t1, v);
-
-    // -- Choose a point on a disk with each half of the disk weighted proportionally to its projection onto direction v
-    float a = 1.0 / (1.0 + v.y);
-    float r = sqrt(u1);
-    float phi = (u2 < a) ? (u2 / a) * PI : PI+ (u2 - a) / (1.0f - a) * PI;
-    float p1 = r * cos(phi);
-    float p2 = r * sin(phi) * ((u2 < a) ? 1.0 : v.y);
-
-    // -- Calculate the normal in this stretched tangent space
-    vec3 n = p1 * t1 + p2 * t2 + sqrt(max(0.0, 1.0 - p1 * p1 - p2 * p2)) * v;
-
-    // -- unstretch and normalize the normal
-    return normalize(vec3(ax * n.x, n.y, ay * n.z));
-}
-
-bool Transmit(vec3 wm, vec3 wi, float n, vec3 wo)
-{
-    float c = dot(wi, wm);
-    if(c < 0.0) {
-        c = -c;
-        wm = -wm;
-    }
-
-    float root = 1.0 - n * n * (1.0 - c * c);
-    if(root <= 0)
-    return false;
-
-    wo = (n * c - sqrt(root)) * wm - n * wi;
-    return true;
-}
-
-struct BsdfSample
-{
-//    uint32 flags;
-//    MediumParameters medium = MediumParameters();
-    vec3 reflectance;//      = float3::Zero_;
-    vec3 wi;//              = float3::Zero_;
-    float forwardPdfW;//       = 0.0f;
-    float reversePdfW;//       = 0.0f;
-};
-
-bool SampleDisneySpecTransmission(float xi_1, float xi_2, Material material, vec3 v, vec3 n, bool thin, BsdfSample bsdfsample)
-{
-    vec3 T, B;
-    getTangent(n, T, B);
-    vec3 wo = ToLocal(T, B, n, v);
-
-    if(CosTheta(wo) == 0.0) {
-        bsdfsample.forwardPdfW = 0.0f;
-        bsdfsample.reversePdfW = 0.0f;
-        bsdfsample.reflectance = vec3(0);
-        bsdfsample.wi = vec3(0);
-        return false;
-    }
-
-    float eta = wo.y > 0.0 ? (1.0 / material.IOR) : material.IOR;
-
-    // -- Scale roughness based on IOR
-    float rscaled = thin ? ThinTransmissionRoughness(material.IOR, material.roughness) : material.roughness;
-    // float rscaled = material.roughness;
-
-    float tax, tay;
-    CalculateAnisotropicParams(rscaled, material.anisotropic, tax, tay);
-
-    // -- Sample visible distribution of normals
-    float r0 = xi_1;
-    float r1 = xi_2;
-    vec3 wm = SampleGgxVndfAnisotropic(wo, tax, tay, r0, r1);
-
-    float dotVH = dot(wo, wm);
-    if(wm.y < 0.0f) {
-        dotVH = -dotVH;
-    }
-
-    float ni = wo.y > 0.0 ? 1.0 : material.IOR;
-    float nt = wo.y > 0.0 ? material.IOR : 1.0;
-    float relativeIOR = ni / nt;
-
-    // -- Disney uses the full dielectric Fresnel equation for transmission. We also importance sample F
-    // -- to switch between refraction and reflection at glancing angles.
-    float F = DielectricFresnel(dotVH, eta);
-
-    // -- Since we're sampling the distribution of visible normals the pdf cancels out with a number of other terms.
-    // -- We are left with the weight G2(wi, wo, wm) / G1(wi, wm) and since Disney uses a separable masking function
-    // -- we get G1(wi, wm) * G1(wo, wm) / G1(wi, wm) = G1(wo, wm) as our weight.
-    float G1v = SeparableSmithGGXG1(wo, wm, tax, tay);
-
-    float pdf;
-
-    vec3 wi;
-    float rd = rand();
-    if(rd <= F) {
-        wi = normalize(reflect(wm, wo));
-
-//        sample.flags = SurfaceEventFlags::eScatterEvent;
-        bsdfsample.reflectance = G1v * material.baseColor;
-
-        float jacobian = (4 * abs(dot(wo, wm)));
-        pdf = F / jacobian;
-    }
-    else {
-    if(thin) {
-        // -- When the surface is thin so it refracts into and then out of the surface during this shading event.
-        // -- So the ray is just reflected then flipped and we use the sqrt of the surface color.
-        wi = reflect(wm, wo);
-        wi.y = -wi.y;
-        bsdfsample.reflectance = G1v * sqrt(material.baseColor);
-
-        // -- Since this is a thin surface we are not ending up inside of a volume so we treat this as a scatter event.
-        // brdfsample.flags = SurfaceEventFlags::eScatterEvent;
-    }
-    else {
-        if(Transmit(wm, wo, relativeIOR, wi)) {
-    //        sample.flags = SurfaceEventFlags::eTransmissionEvent;
-    //        sample.medium.phaseFunction = dotVH > 0.0f ? MediumPhaseFunction::eIsotropic : MediumPhaseFunction::eVacuum;
-    //        sample.medium.extinction = CalculateExtinction(surface.transmittanceColor, surface.scatterDistance);
-        }
-        else {
-    //    sample.flags = SurfaceEventFlags::eScatterEvent;
-            wi = reflect(wm, wo);
-        }
-
-        bsdfsample.reflectance = G1v * material.baseColor;
-    }
-
-    wi = normalize(wi);
-
-    float dotLH = abs(dot(wi, wm));
-    float jacobian = dotLH / (sqr(dotLH + eta * dotVH));
-    pdf = (1.0 - F) / jacobian;
-    }
-
-    if(CosTheta(wi) == 0.0) {
-        bsdfsample.forwardPdfW = 0.0;
-        bsdfsample.reversePdfW = 0.0;
-        bsdfsample.reflectance = vec3(0);
-        bsdfsample.wi = vec3(0);
-        return false;
-    }
-
-    if(material.roughness < 0.01) {
-        // -- This is a hack to allow us to sample the correct IBL texture when a path bounced off a smooth surface.
-//        sample.flags |= SurfaceEventFlags::eDiracEvent;
-    }
-
-    // -- calculate VNDF pdf terms and apply Jacobian and Fresnel sampling adjustments
-    GgxVndfAnisotropicPdf(wi, wm, wo, tax, tay, bsdfsample.forwardPdfW, bsdfsample.reversePdfW);
-    bsdfsample.forwardPdfW *= pdf;
-    bsdfsample.reversePdfW *= pdf;
-
-    // -- convert wi back to world space
-    bsdfsample.wi = normalize(ToWorld(T, B, n, wi));
-//    bsdfsample.wi = normalize(MatrixMultiply(wi, MatrixTranspose(surface.worldToTangent)));
-
-    return true;
-}
-
-
-
-
 
 
 // 将三维向量 v 转为 HDR map 的纹理坐标 uv
@@ -1148,6 +816,17 @@ vec3 SampleHemisphere(float xi_1, float xi_2) {
     return vec3(r * cos(phi), r * sin(phi), z);
 }
 
+vec3 CosineSampleHemisphere(float r1, float r2)
+{
+    vec3 dir;
+    float r = sqrt(r1);
+    float phi = TWO_PI * r2;
+    dir.x = r * cos(phi);
+    dir.y = r * sin(phi);
+    dir.z = sqrt(max(0.0, 1.0 - dir.x * dir.x - dir.y * dir.y));
+    return dir;
+}
+
 // 将向量 v 投影到 N 的法向半球
 // ------------------------
 vec3 toNormalHemisphere(vec3 v, vec3 N) {
@@ -1192,6 +871,21 @@ vec3 SampleGTR1(float xi_1, float xi_2, vec3 V, vec3 N, float alpha) {
     vec3 L = reflect(-V, H);
 
     return L;
+}
+
+vec3 SampleGTR1(float rgh, float r1, float r2)
+{
+    float a = max(0.001, rgh);
+    float a2 = a * a;
+
+    float phi = r1 * TWO_PI;
+
+    float cosTheta = sqrt((1.0 - pow(a2, 1.0 - r1)) / (1.0 - a2));
+    float sinTheta = clamp(sqrt(1.0 - (cosTheta * cosTheta)), 0.0, 1.0);
+    float sinPhi = sin(phi);
+    float cosPhi = cos(phi);
+
+    return vec3(sinTheta * cosPhi, sinTheta * sinPhi, cosTheta); // H
 }
 
 // GTR2 重要性采样
@@ -1254,26 +948,17 @@ vec2 CranleyPattersonRotation(vec2 p) {
 
 // 按照辐射度分布分别采样三种 BRDF
 vec3 SampleBRDF(float xi_1, float xi_2, float xi_3, vec3 V, vec3 N, in Material material) {
-    float alpha_GTR1 = mix(0.1, 0.001, material.clearcoatGloss);
-    float alpha_GTR2 = max(0.001, sqr(material.roughness));
-
-    // 辐射度统计 Weight
-    float r_diffuse = (1.0 - material.metallic) * (1.0 - material.transmission);
-    // float r_specular = 1.0;
-    float r_specular = material.metallic + (1.0f - material.transmission) * (1.0f - material.metallic);
-    float r_clearcoat = 0.25 * material.clearcoat * (1.0 - material.metallic);
-    float r_refraction = (1.0 - material.metallic) * material.transmission;
-    float r_sum = r_diffuse + r_specular + r_clearcoat;
-
-    if (enableBSDF) {
-        r_sum += r_refraction;
-    }
 
     // 根据辐射度计算概率
-    float p_diffuse = r_diffuse / r_sum;
-    float p_specular = r_specular / r_sum;
-    float p_clearcoat = r_clearcoat / r_sum;
-    float p_refraction = r_refraction / r_sum;
+    float p_diffuse;
+    float p_specular;
+    float p_clearcoat;
+    float p_refraction;
+
+    CalculateBRDFLobePdfs(material, p_diffuse, p_specular, p_clearcoat, p_refraction);
+
+    float alpha_GTR1 = mix(0.1, 0.001, material.clearcoatGloss);
+    float alpha_GTR2 = max(0.001, sqr(material.roughness));
 
     // CDF for picking a lobe
     float cdf[4];
@@ -1297,7 +982,7 @@ vec3 SampleBRDF(float xi_1, float xi_2, float xi_3, vec3 V, vec3 N, in Material 
 //    float F = 1.0 - ((1.0 - fresnel) * material.transmission * (1.0 - material.metallic));
 
     // 漫反射
-    if(rd <= p_diffuse) {
+    if(rd <= cdf[0]) {
         return SampleCosineHemisphere(xi_1, xi_2, N);
     }
     // 清漆
@@ -1391,7 +1076,10 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material)
     return diffuse * (1.0 - material.metallic) + specular + clearcoat;
 }
 
-vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material) {
+vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material, out float pdf) {
+
+    pdf = 1e-10;
+
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
 
@@ -1431,7 +1119,7 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material) {
     float   Gs = smithG_GGX(NdotL, material.roughness);
     Gs *= smithG_GGX(NdotV, material.roughness);
 
-    // Refraction
+    // 折射 Refraction
     float eta = dot(V, N) > 0.0 ? (1.0 / material.IOR) : material.IOR;
     float F = DielectricFresnel(abs(VdotH), eta);
     float denom = LdotH + VdotH * eta;
@@ -1439,25 +1127,48 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material) {
     float eta2 = eta * eta;
     float jacbian = abs(LdotH) / denom;
 
-    // 清漆
+    // 清漆 Clearcoat
     float Dr = GTR1(NdotH, mix(0.1, 0.001, material.clearcoatGloss));
     float Fr = mix(0.04, 1.0, FH);
     float Gr = smithG_GGX(NdotL, 0.25) * smithG_GGX(NdotV, 0.25);
 
-    // sheen
+    // 光泽 sheen
     vec3 Fsheen = FH * material.sheen * Csheen;
 
     // Evaluate xxx Item BSDF fr
     vec3 diffuse = INV_PI * mix(Fd, ss, material.subsurface) * Cdlin + Fsheen;
-    // vec3 diffuse = (1.0 - mat.metallic) * (1.0 - mat.specTrans) * (INV_PI * mix(Fd, ss, mat.subsurface) * mat.baseColor + Fsheen);
     vec3 specular = Gs * Fs * Ds;
-    // vec3 specular = Gs * Fs * Ds / (4.0 * NdotL * NdotV);
     vec3 clearcoat = vec3(0.25) * Gr * Fr * Dr * material.clearcoat;
+    // vec3 diffuse = (1.0 - mat.metallic) * (1.0 - mat.specTrans) * (INV_PI * mix(Fd, ss, mat.subsurface) * mat.baseColor + Fsheen);
+    // vec3 specular = Gs * Fs * Ds / (4.0 * NdotL * NdotV);
     // vec3 clearcoat = vec3(0.25) * mat.clearcoat * F * D * G / (4.0 * NdotL * NdotV);
+
+    // 根据辐射度计算概率
+    float p_diffuse;
+    float p_specular;
+    float p_clearcoat;
+    float p_refraction;
+
+    CalculateBRDFLobePdfs(material, p_diffuse, p_specular, p_clearcoat, p_refraction);
+
+    // 分别计算三种 BRDF 的概率密度
+    float pdf_diffuse = NdotL * INV_PI; // L.z * INV_PI
+    float pdf_specular = Ds * NdotH / (4.0 * LdotH); // G1 * D / (4.0 * NdotV);
+    float pdf_clearcoat = Dr * NdotH / (4.0 * LdotH);
+    float pdf_refraction = max(0.0, VdotH) * Ds * NdotH * jacbian / NdotL;
+
+    // 根据概率混合 pdf
+    pdf = p_diffuse * pdf_diffuse + p_specular * pdf_specular + p_clearcoat * pdf_clearcoat;
+
+    if(enableBSDF) {
+        pdf += p_refraction * pdf_refraction;
+    }
+
+    pdf = max(1e-10, pdf);
 
     if (enableBSDF) {
         // vec3 refraction = pow(Cdlin, vec3(0.5)) * (1.0 - material.metallic) * material.transmission * (1.0 - F) * Ds * Gs * abs(VdotH) * jacbian * eta2 / abs(NdotV / NdotL);
-        vec3 refraction = pow(Cdlin, vec3(0.5)) * (1.0 - material.metallic) * material.transmission * (1.0 - F) * Ds * Gs * abs(VdotH) * jacbian * eta2 / abs(NdotV * NdotL);
+        vec3 refraction = pow(Cdlin, vec3(0.5)) * (1.0 - material.metallic) * material.transmission * (1.0 - F) * abs(VdotH) * jacbian * eta2 / abs(NdotV * NdotL);
 
         diffuse = max(vec3(0), diffuse);
         specular = max(vec3(0), specular);
@@ -1473,19 +1184,263 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material) {
      return (1.0 - material.metallic) * (1.0 - material.transmission) * diffuse + specular + clearcoat;
 }
 
+vec3 EvalDiffuse(Material mat, vec3 Csheen, vec3 V, vec3 L, vec3 H, out float pdf)
+{
+    pdf = 0.0;
+    if (L.z <= 0.0)
+    return vec3(0.0);
+
+    // Diffuse
+    float FL = SchlickFresnel(L.z);
+    float FV = SchlickFresnel(V.z);
+    float FH = SchlickFresnel(dot(L, H));
+    float Fd90 = 0.5 + 2.0 * dot(L, H) * dot(L, H) * mat.roughness;
+    float Fd = mix(1.0, Fd90, FL) * mix(1.0, Fd90, FV);
+
+    // Fake Subsurface TODO: Replace with volumetric scattering
+    float Fss90 = dot(L, H) * dot(L, H) * mat.roughness;
+    float Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV);
+    float ss = 1.25 * (Fss * (1.0 / (L.z + V.z) - 0.5) + 0.5);
+
+    // Sheen
+    vec3 Fsheen = FH * mat.sheen * Csheen;
+
+    pdf = L.z * INV_PI;
+    return (1.0 - mat.metallic) * (1.0 - mat.transmission) * (INV_PI * mix(Fd, ss, mat.subsurface) * mat.baseColor + Fsheen);
+}
+
+vec3 EvalSpecReflection(Material mat, float eta, vec3 specCol, vec3 V, vec3 L, vec3 H, out float pdf)
+{
+    pdf = 0.0;
+    if (L.z <= 0.0)
+    return vec3(0.0);
+
+    float FM = DisneyFresnel(mat, eta, dot(L, H), dot(V, H));
+    vec3 F = mix(specCol, vec3(1.0), FM);
+    float D = GTR2Aniso(H.z, H.x, H.y, mat.ax, mat.ay);
+    float G1 = SmithGAniso(abs(V.z), V.x, V.y, mat.ax, mat.ay);
+    float G2 = G1 * SmithGAniso(abs(L.z), L.x, L.y, mat.ax, mat.ay);
+
+    pdf = G1 * D / (4.0 * V.z);
+    return F * D * G2 / (4.0 * L.z * V.z);
+}
+
+vec3 EvalSpecRefraction(Material mat, float eta, vec3 V, vec3 L, vec3 H, out float pdf)
+{
+    pdf = 0.0;
+    if (L.z >= 0.0)
+    return vec3(0.0);
+
+    float F = DielectricFresnel(abs(dot(V, H)), eta);
+    float D = GTR2Aniso(H.z, H.x, H.y, mat.ax, mat.ay);
+    float G1 = SmithGAniso(abs(V.z), V.x, V.y, mat.ax, mat.ay);
+    float G2 = G1 * SmithGAniso(abs(L.z), L.x, L.y, mat.ax, mat.ay);
+    float denom = dot(L, H) + dot(V, H) * eta;
+    denom *= denom;
+    float eta2 = eta * eta;
+    float jacobian = abs(dot(L, H)) / denom;
+
+    pdf = G1 * max(0.0, dot(V, H)) * D * jacobian / V.z;
+
+    return pow(mat.baseColor, vec3(0.5)) * (1.0 - mat.metallic) * mat.transmission * (1.0 - F) * D * G2 * abs(dot(V, H)) * jacobian * eta2 / abs(L.z * V.z);
+}
+
+vec3 EvalClearcoat(Material mat, vec3 V, vec3 L, vec3 H, out float pdf)
+{
+    pdf = 0.0;
+    if (L.z <= 0.0)
+    return vec3(0.0);
+
+    float FH = DielectricFresnel(dot(V, H), 1.0 / 1.5);
+    float F = mix(0.04, 1.0, FH);
+    float D = GTR1(H.z, mat.clearcoatGloss);
+    float G = SmithG(L.z, 0.25) * SmithG(V.z, 0.25);
+    float jacobian = 1.0 / (4.0 * dot(V, H));
+
+    pdf = D * H.z * jacobian;
+    return vec3(0.25) * mat.clearcoat * F * D * G / (4.0 * L.z * V.z);
+}
+
+vec3 DisneyEval(Material material, vec3 V, vec3 N, vec3 L, out float bsdfPdf)
+{
+    // V = -hit.viewDir
+    // N already flipped
+
+    bsdfPdf = 0.0;
+    vec3 f = vec3(0.0);
+
+    // TODO: Tangent and bitangent should be calculated from mesh (provided, the mesh has proper uvs)
+    vec3 T, B;
+    getTangent(N, T, B);
+    V = ToLocal(T, B, N, V); // NDotL = L.z; NDotV = V.z; NDotH = H.z
+    L = ToLocal(T, B, N, L);
+
+    float eta = dot(V, N) > 0.0 ? (1.0 / material.IOR) : material.IOR;
+
+    vec3 H;
+    if (L.z > 0.0)
+    H = normalize(L + V);
+    else
+    H = normalize(L + V * eta);
+
+    if (H.z < 0.0)
+    H = -H;
+
+    // Specular and sheen color
+    vec3 specCol, sheenCol;
+    GetSpecColor(material, eta, specCol, sheenCol);
+
+    // Lobe weights
+    float diffuseWt, specReflectWt, specRefractWt, clearcoatWt;
+    float fresnel = DisneyFresnel(material, eta, dot(L, H), dot(V, H));
+    GetLobeProbabilities(material, eta, specCol, fresnel, diffuseWt, specReflectWt, specRefractWt, clearcoatWt);
+
+    float pdf;
+
+    // Diffuse
+    if (diffuseWt > 0.0 && L.z > 0.0)
+    {
+        f += EvalDiffuse(material, sheenCol, V, L, H, pdf);
+        bsdfPdf += pdf * diffuseWt;
+    }
+
+    // Specular Reflection
+    if (specReflectWt > 0.0 && L.z > 0.0 && V.z > 0.0)
+    {
+        f += EvalSpecReflection(material, eta, specCol, V, L, H, pdf);
+        bsdfPdf += pdf * specReflectWt;
+    }
+
+    // Specular Refraction
+    if (specRefractWt > 0.0 && L.z < 0.0)
+    {
+        f += EvalSpecRefraction(material, eta, V, L, H, pdf);
+        bsdfPdf += pdf * specRefractWt;
+    }
+
+    // Clearcoat
+    if (clearcoatWt > 0.0 && L.z > 0.0 && V.z > 0.0)
+    {
+        f += EvalClearcoat(material, V, L, H, pdf);
+        bsdfPdf += pdf * clearcoatWt;
+    }
+
+    return f * abs(L.z);
+}
+
+// SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
+vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V, vec3 N, out vec3 L, out float pdf)
+{
+    pdf = 0.0;
+    vec3 f = vec3(0.0);
+
+    float r1 = xi_1;
+    float r2 = xi_2;
+
+    // TODO: Tangent and bitangent should be calculated from mesh (provided, the mesh has proper uvs)
+    vec3 T, B;
+    getTangent(N, T, B);
+    V = ToLocal(T, B, N, V); // NDotL = L.z; NDotV = V.z; NDotH = H.z
+
+    float eta = dot(V, N) > 0.0 ? (1.0 / material.IOR) : material.IOR;
+
+    // Specular and sheen color
+    vec3 specCol, sheenCol;
+    GetSpecColor(material, eta, specCol, sheenCol);
+
+    // Lobe weights
+    float diffuseWt, specReflectWt, specRefractWt, clearcoatWt;
+    // Note: Fresnel is approx and based on N and not H since H isn't available at this stage.
+    float approxFresnel = DisneyFresnel(material, eta, V.z, V.z);
+    GetLobeProbabilities(material, eta, specCol, approxFresnel, diffuseWt, specReflectWt, specRefractWt, clearcoatWt);
+
+    // CDF for picking a lobe
+    float cdf[4];
+    cdf[0] = diffuseWt;
+    cdf[1] = cdf[0] + clearcoatWt;
+    cdf[2] = cdf[1] + specReflectWt;
+    cdf[3] = cdf[2] + specRefractWt;
+
+    if (r1 < cdf[0]) // Diffuse Reflection Lobe
+    {
+        r1 /= cdf[0];
+        L = CosineSampleHemisphere(r1, r2);
+
+        vec3 H = normalize(L + V);
+
+        f = EvalDiffuse(material, sheenCol, V, L, H, pdf);
+        pdf *= diffuseWt;
+    }
+    else if (r1 < cdf[1]) // Clearcoat Lobe
+    {
+        r1 = (r1 - cdf[0]) / (cdf[1] - cdf[0]);
+
+        vec3 H = SampleGTR1(material.clearcoatGloss, r1, r2);
+
+        if (H.z < 0.0)
+        H = -H;
+
+        L = normalize(reflect(-V, H));
+
+        f = EvalClearcoat(material, V, L, H, pdf);
+        pdf *= clearcoatWt;
+    }
+    else  // Specular Reflection/Refraction Lobes
+    {
+        r1 = (r1 - cdf[1]) / (1.0 - cdf[1]);
+        vec3 H = SampleGGXVNDF(V, material.ax, material.ay, r1, r2);
+
+        if (H.z < 0.0)
+        H = -H;
+
+        // TODO: Refactor into metallic BRDF and specular BSDF
+        float fresnel = DisneyFresnel(material, eta, dot(L, H), dot(V, H));
+        float F = 1.0 - ((1.0 - fresnel) * material.transmission * (1.0 - material.metallic));
+
+        if (rand() < F)
+        {
+            L = normalize(reflect(-V, H));
+
+            f = EvalSpecReflection(material, eta, specCol, V, L, H, pdf);
+            pdf *= F;
+        }
+        else
+        {
+            L = normalize(refract(-V, H, eta));
+
+            f = EvalSpecRefraction(material, eta, V, L, H, pdf);
+            pdf *= 1.0 - F;
+        }
+
+        pdf *= specReflectWt + specRefractWt;
+    }
+
+    L = ToWorld(T, B, N, L);
+    return f * abs(dot(N, L));
+}
+
 // 获取 BRDF 在 L 方向上的概率密度 pdf
 float BRDF_Pdf(vec3 V, vec3 N, vec3 L, in Material material) {
+
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
-
-    if(!enableBSDF) {
-        if(NdotL < 0 || NdotV < 0) return 0;
-    }
 
     vec3 H = normalize(L + V);
     float NdotH = dot(N, H);
     float LdotH = dot(L, H);
     float VdotH = dot(V, H);
+
+    if(!enableBSDF) {
+        if(NdotL < 0 || NdotV < 0) return 0;
+    }
+
+    // 根据辐射度计算概率
+    float p_diffuse;
+    float p_specular;
+    float p_clearcoat;
+    float p_refraction;
+
+    CalculateBRDFLobePdfs(material, p_diffuse, p_specular, p_clearcoat, p_refraction);
 
     // Color
     vec3 Cdlin = material.baseColor;
@@ -1514,35 +1469,10 @@ float BRDF_Pdf(vec3 V, vec3 N, vec3 L, in Material material) {
     float pdf_clearcoat = Dr * NdotH / (4.0 * LdotH);
     float pdf_refraction = max(0.0, VdotH) * Ds * NdotH * jacobian / NdotL;
 
-    // 辐射度统计 weight
-    float r_diffuse = (1.0 - material.metallic) * (1.0 - material.transmission);
-    // float r_specular = 1.0;
-    float r_specular = material.metallic + (1.0f - material.transmission) * (1.0f - material.metallic);
-    float r_clearcoat = 0.25 * material.clearcoat * (1.0 - material.metallic);
-    // float r_refraction = (1.0 - FH) * (1.0 - material.metallic) * material.transmission;
-    float r_refraction = (1.0 - material.metallic) * material.transmission;
-
-    float r_sum = r_diffuse + r_specular + r_clearcoat;// + r_refraction;
-
-    if(enableBSDF) {
-        // r_diffuse = max(0.0, r_diffuse);
-        // r_specular = max(0.0, r_diffuse);
-        // r_clearcoat = max(0.0, r_diffuse);
-        r_refraction = max(0.0, r_diffuse);
-        r_sum += r_refraction;
-    }
-
-    // 根据辐射度计算选择某种采样方式的概率
-    float p_diffuse = r_diffuse / r_sum;
-    float p_specular = r_specular / r_sum;
-    float p_clearcoat = r_clearcoat / r_sum;
-
     // 根据概率混合 pdf
     float pdf = p_diffuse * pdf_diffuse + p_specular * pdf_specular + p_clearcoat * pdf_clearcoat;
 
     if(enableBSDF) {
-        // return r_refraction * pdf_refraction;
-        float p_refraction = r_refraction / r_sum;
         pdf += p_refraction * pdf_refraction;
     }
 
@@ -1663,8 +1593,8 @@ vec3 shadingImportanceSampling(HitRecord hit) {
                 vec3 L = hdrTestRay.direction;
                 vec3 skyColor = hdrColor(L);
                 float pdf_light = hdrPdf(L, hdrResolution);
-                vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
-                float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+                float pdf_brdf;
+                vec3 f_r = BRDF_Evaluate(V, N, L, hit.material, pdf_brdf);
 
 //                Lo += history * skyColor / pdf_light;
 
@@ -1686,8 +1616,8 @@ vec3 shadingImportanceSampling(HitRecord hit) {
         float NdotL = dot(N, L);
 
         // 获取 L 方向上的 BRDF 值和概率密度
-        vec3 f_r = BRDF_Evaluate(V, N, L, hit.material);
-        float pdf_brdf = BRDF_Pdf(V, N, L, hit.material);
+        float pdf_brdf;
+        vec3 f_r = BRDF_Evaluate(V, N, L, hit.material, pdf_brdf);
         if(pdf_brdf <= 0.0) break;
 
         // 漫反射: 随机发射光线
@@ -1709,6 +1639,113 @@ vec3 shadingImportanceSampling(HitRecord hit) {
 
 //                // BRDF 重要性采样
 //                Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
+            }
+            else {
+                skyColor = getDefaultSkyColor(randomRay.direction.y);
+                Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
+            }
+            break;
+        }
+
+        // 命中
+        vec3 Le = newHit.material.emissive;
+        Lo += history * Le * f_r * abs(NdotL) / pdf_brdf;
+
+        // 递归(步进)
+        hit = newHit;
+        history *= f_r * abs(NdotL) / pdf_brdf;  // 累积颜色
+    }
+    return Lo;
+}
+
+// 路径追踪着色-重要性采样
+// ----------
+vec3 shadingBSDFImportanceSampling(HitRecord hit) {
+
+    vec3 Lo = vec3(0);
+    vec3 history = vec3(1);
+
+    for (int i = 0; i < maxBounce; i++) {
+
+        vec3 V = -hit.viewDir;
+        vec3 N = hit.normal;
+
+//        // HDR 环境贴图重要性采样
+//        Ray hdrTestRay;
+//        hdrTestRay.origin = hit.hitPoint;
+//        hdrTestRay.direction = SampleHdr(rand(), rand());
+//
+//        // 进行一次求交测试 判断是否有遮挡
+//        if(dot(N, hdrTestRay.direction) > 0.0) { // 如果采样方向背向点 p 则放弃测试, 因为 N dot L < 0
+//            HitRecord hdrHit = hitBVH(hdrTestRay);
+//
+//            // 天空光仅在没有遮挡的情况下积累亮度
+//            if(!hdrHit.isHit) {
+//                // 获取采样方向 L 上的: 1.光照贡献, 2.环境贴图在该位置的 pdf, 3.BRDF 函数值, 4.BRDF 在该方向的 pdf
+//                vec3 L = hdrTestRay.direction;
+//                vec3 skyColor = hdrColor(L);
+//                float pdf_light = hdrPdf(L, hdrResolution);
+//                float pdf_brdf;
+//                vec3 f_r = BRDF_Evaluate(V, N, L, hit.material, pdf_brdf);
+//
+//                //                Lo += history * skyColor / pdf_light;
+//
+//                // 多重重要性采样
+//                float mis_weight = misMixWeight(pdf_light, pdf_brdf);
+//                Lo += mis_weight * history * skyColor * f_r * abs(dot(N, L)) / pdf_light;
+//            }
+//        }
+
+        // 获取 3 个随机数
+        vec2 uv = sobolVec2(camera.loopNum + 1, i);
+        uv = CranleyPattersonRotation(uv);
+        float xi_1 = uv.x;
+        float xi_2 = uv.y;
+        float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
+
+        // 采样 BRDF 得到一个方向 L
+        float pdf;
+        vec3 L = vec3(0.0, 1.0, 0.0);
+        if (enableBSDF) {
+            DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, pdf);
+        }
+        else {
+            L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
+        }
+        float NdotL = dot(N, L);
+
+        // 获取 L 方向上的 BRDF 值和概率密度
+        float pdf_brdf;
+        vec3 f_r;
+
+        if (enableBSDF) {
+            f_r = DisneyEval(hit.material, V, N, L, pdf_brdf);
+        }
+        else {
+            f_r = BRDF_Evaluate(V, N, L, hit.material, pdf_brdf);
+        }
+
+        if(pdf_brdf <= 0.0) break;
+
+        // 漫反射: 随机发射光线
+        Ray randomRay;
+        randomRay.origin = hit.hitPoint;
+        randomRay.direction = L;
+        HitRecord newHit = hitBVH(randomRay);
+
+        // 反弹未命中
+        if(!newHit.isHit) {
+            vec3 skyColor = vec3(0);
+            if(enableEnvMap) {
+                skyColor = hdrColor(L);
+
+//                // 多重重要性采样
+//                float pdf_light = hdrPdf(L, hdrResolution);
+//                float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
+//                Lo += mis_weight * history * skyColor * f_r * abs(NdotL) / pdf_brdf;
+
+                // BRDF 重要性采样
+                Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
             }
             else {
                 skyColor = getDefaultSkyColor(randomRay.direction.y);
@@ -1754,7 +1791,8 @@ void main() {
             vec3 Le = firstHit.material.emissive;
             vec3 Li = vec3(0);
             if(enableImportantSample) {
-                Li = shadingImportanceSampling(firstHit);
+//                Li = shadingImportanceSampling(firstHit);
+                Li = shadingBSDFImportanceSampling(firstHit);
             }
             else {
                 Li = shading(firstHit);
