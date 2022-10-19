@@ -287,6 +287,7 @@ int main() {
     // Render Setting
     bool show_demo_window = false;
     bool enableImportantSample = true;
+    bool enableMultiImportantSample = true;
     bool enableEnvMap = true;
     bool enableToneMapping = true;
     bool enableGammaCorrection = true;
@@ -328,6 +329,9 @@ int main() {
             camera.LoopNum = 0;
         }
         if (ImGui::Checkbox("Enable Important Sampling", &enableImportantSample)) {
+            camera.LoopNum = 0;
+        }
+        if (ImGui::Checkbox("Enable Multi-Important Sampling", &enableMultiImportantSample)) {
             camera.LoopNum = 0;
         }
         if (ImGui::SliderInt("Max Bounce", &maxBounce, 1, MAX_BOUNCE)) {
@@ -478,6 +482,7 @@ int main() {
             RayTracerShader.setInt("screenWidth", width);
             RayTracerShader.setInt("screenHeight", height);
             RayTracerShader.setBool("enableImportantSample", enableImportantSample);
+            RayTracerShader.setBool("enableMultiImportantSample", enableMultiImportantSample);
             RayTracerShader.setBool("enableEnvMap", enableEnvMap);
             RayTracerShader.setInt("maxBounce", maxBounce);
             RayTracerShader.setInt("maxIterations", maxIterations);
