@@ -111,7 +111,7 @@ void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Mate
 
 void RefreshTriangleMaterial(vector<Triangle> &triangles, vector<Triangle_encoded> &triangles_encoded, Material m, GLuint tbo, GLuint textureBuffer) {
     int n = triangles.size();
-    for (int i = 0; i < n; i++) {
+    for (int i = 1; i < n-1; i++) {
         Triangle &t = triangles[i];
         t.material = m;
         triangles_encoded[i].emissive = m.emissive;

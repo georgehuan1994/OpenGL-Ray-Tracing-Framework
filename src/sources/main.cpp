@@ -133,6 +133,7 @@ int main() {
     plane.baseColor = vec3(0.73, 0.73, 0.73);
     plane.roughness = 0.1;
     plane.specular = 1.0;
+    plane.metallic = 0.2;
 
     Material white;
     white.baseColor = vec3(0.73, 0.73, 0.73);
@@ -147,30 +148,43 @@ int main() {
 
     Material golden;
     golden.baseColor = vec3(0.75, 0.7, 0.15);
-    golden.roughness = 0.1;
+    golden.roughness = 0.05;
     golden.specular = 1.0;
     golden.metallic = 1.0;
 
+    Material copper_bsdf;
+    copper_bsdf.baseColor = vec3(238.0f/255.0f, 158.0f/255.0f, 137.0f/255.0f);
+    golden.roughness = 0.05;
+    golden.specular = 1.0;
+    copper_bsdf.IOR = 1.21901;
+    copper_bsdf.metallic = 1.0;
+
+    Material glass;
+    glass.baseColor = vec3(1, 1, 1);
+    glass.specular = 1.0;
+    glass.transmission = 1.0;
+    glass.IOR = 1.5;
+
     // TODO GameObject
 
-    Material current_material = jade;
+    Material current_material = copper_bsdf;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
     getTriangle(floor.meshes, triangles, plane,
                 getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
 
-    Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
-    getTriangle(bunny.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
+    // Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
+    // getTriangle(bunny.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
 
     // Model sphere("../../resources/objects/sphere2.obj");
     // getTriangle(sphere.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2.2, 0, 3), vec3(2)), true);
+    //             getTransformMatrix(vec3(0), vec3(2.2, -1, 3), vec3(2)), true);
 
-    // Model loong("../../resources/objects/loong.obj");        // 100000 face
-    // getTriangle(loong.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2, -2.2, 3), vec3(3.5)), true);
+    Model loong("../../resources/objects/loong.obj");        // 100000 face
+    getTriangle(loong.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
 
     // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
     // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
@@ -291,7 +305,7 @@ int main() {
     bool enableEnvMap = true;
     bool enableToneMapping = true;
     bool enableGammaCorrection = true;
-    bool enableBSDF = false;
+    bool enableBSDF = true;
     int maxBounce = 4;
     int maxIterations = 1000;
     for (int i = 0; i < 3; ++i) {
@@ -432,7 +446,7 @@ int main() {
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;
         }
-        if (ImGui::SliderFloat("IOR", &IOR, 0.0f, 1.5f)) {
+        if (ImGui::SliderFloat("IOR", &IOR, 0.001f, 2.45f)) {
             current_material.IOR = IOR;
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;

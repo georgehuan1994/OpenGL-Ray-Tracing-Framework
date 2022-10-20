@@ -31,7 +31,7 @@ After [《Ray Tracing in One Weekend Book Series》](https://github.com/RayTraci
 
 ## TODO
 
-- Disney BSDF and important sampling
-- Texture
+- Texture mapping
 - Object / Material / Scene manager
 - Gizmo
+- Compute Shader version

@@ -521,8 +521,8 @@ void GetLobeProbabilities(Material material, float eta, vec3 specCol, float appr
 {
     diffuseWeight       = (1.0 - material.metallic) * (1.0 - material.transmission) * Luminance(material.baseColor);
     specReflectWt       = Luminance(mix(specCol, vec3(1.0), approxFresnel));
-    clearcoatWt         = (1.0 - material.metallic) * 0.25 * material.clearcoat;
     specRefractWt       = (1.0 - material.metallic) * material.transmission * Luminance(material.baseColor) * (1.0 - approxFresnel);
+    clearcoatWt         = (1.0 - material.metallic) * 0.25 * material.clearcoat;
 
     float totalWt = diffuseWeight + specReflectWt + specRefractWt + clearcoatWt;
 
@@ -540,9 +540,9 @@ void CalculateBSDFLobePdfs(Material material, out float pSpecular, out float pDi
     float specularBSDF   = (1.0 - material.metallic) * material.transmission;
     float dielectricBRDF = (1.0 - material.metallic) * (1.0 - material.transmission);
 
+    float diffuseWeight      = dielectricBRDF;
     float specularWeight     = metallicBRDF + dielectricBRDF;
     float transmissionWeight = specularBSDF;
-    float diffuseWeight      = dielectricBRDF;
     float clearcoatWeight    = 1.0 * max(0, material.clearcoat);
 
     float norm = 1.0 / (specularWeight + transmissionWeight + diffuseWeight + clearcoatWeight);
@@ -613,6 +613,16 @@ vec2 SampleSphericalMap(vec3 v) {
     return uv;
 }
 
+// 将三维向量 v 转为 HDR map 的纹理坐标 uv
+// -----------------------------------
+vec2 toSphericalCoord(vec3 v) {
+    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
+    uv /= vec2(2.0 * PI, PI);
+    uv += 0.5;
+    uv.y = 1.0 - uv.y;
+    return uv;
+}
+
 // 获取 HDR 环境颜色
 // ---------------
 vec3 SampleHdr(vec3 v) {
@@ -636,15 +646,6 @@ vec3 SampleHdr(float xi_1, float xi_2) {
     return L;
 }
 
-// 将三维向量 v 转为 HDR map 的纹理坐标 uv
-// -----------------------------------
-vec2 toSphericalCoord(vec3 v) {
-    vec2 uv = vec2(atan(v.z, v.x), asin(v.y));
-    uv /= vec2(2.0 * PI, PI);
-    uv += 0.5;
-    uv.y = 1.0 - uv.y;
-    return uv;
-}
 
 // 半球均匀采样
 // ----------
@@ -855,12 +856,12 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material)
     float VdotH = dot(V, H);
 
     // 各种颜色
-    vec3 Cdlin = material.baseColor;
-    float Cdlum = 0.3 * Cdlin.r + 0.6 * Cdlin.g  + 0.1 * Cdlin.b;
-    vec3 Ctint = (Cdlum > 0) ? (Cdlin/Cdlum) : (vec3(1));
-    vec3 Cspec = material.specular * mix(vec3(1), Ctint, material.specularTint);
-    vec3 Cspec0 = mix(0.08 * Cspec, Cdlin, material.metallic); // 0° 镜面反射颜色
-    vec3 Csheen = mix(vec3(1), Ctint, material.sheenTint);   // 织物颜色
+    vec3    Cdlin   = material.baseColor;
+    float   Cdlum   = 0.3 * Cdlin.r + 0.6 * Cdlin.g  + 0.1 * Cdlin.b;
+    vec3    Ctint   = (Cdlum > 0) ? (Cdlin/Cdlum) : (vec3(1));
+    vec3    Cspec   = material.specular * mix(vec3(1), Ctint, material.specularTint);
+    vec3    Cspec0  = mix(0.08 * Cspec, Cdlin, material.metallic); // 0° 镜面反射颜色
+    vec3    Csheen  = mix(vec3(1), Ctint, material.sheenTint);   // 织物颜色
 
     // 漫反射 Fd
     float Fd90 = 0.5 + 2.0 * LdotH * LdotH * material.roughness;
@@ -936,12 +937,12 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material, out float pdf) 
     float VdotH = dot(V, H);
 
     // Color
-    vec3 Cdlin = material.baseColor;
-    float Cdlum = Luminance(Cdlin);
-    vec3 Ctint = (Cdlum > 0) ? (Cdlin/Cdlum) : (vec3(1));
-    vec3 Cspec = material.specular * mix(vec3(1), Ctint, material.specularTint);
-    vec3 Cspec0 = mix(0.08 * Cspec, Cdlin, material.metallic); // 0° 镜面反射颜色
-    vec3 Csheen = mix(vec3(1), Ctint, material.sheenTint);   // 织物颜色
+    vec3    Cdlin   = material.baseColor;
+    float   Cdlum   = Luminance(Cdlin);
+    vec3    Ctint   = (Cdlum > 0) ? (Cdlin/Cdlum) : (vec3(1));
+    vec3    Cspec   = material.specular * mix(vec3(1), Ctint, material.specularTint);
+    vec3    Cspec0  = mix(0.08 * Cspec, Cdlin, material.metallic);  // 0° 镜面反射颜色
+    vec3    Csheen  = mix(vec3(1), Ctint, material.sheenTint);      // 织物颜色
 
     // 漫反射 Diffuse
     float Fd90 = 0.5 + 2.0 * LdotH * LdotH * material.roughness;
@@ -998,30 +999,12 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material, out float pdf) 
     float pdf_diffuse = NdotL * INV_PI; // L.z * INV_PI
     float pdf_specular = Ds * NdotH / (4.0 * LdotH); // G1 * D / (4.0 * NdotV);
     float pdf_clearcoat = Dr * NdotH / (4.0 * LdotH);
-    float pdf_refraction = max(0.0, VdotH) * Ds * NdotH * jacbian / NdotL;
+    // float pdf_refraction = max(0.0, VdotH) * Ds * NdotH * jacbian / NdotL;
 
     // 根据概率混合 pdf
     pdf = p_diffuse * pdf_diffuse + p_specular * pdf_specular + p_clearcoat * pdf_clearcoat;
 
-    if(enableBSDF) {
-        pdf += p_refraction * pdf_refraction;
-    }
-
     pdf = max(1e-10, pdf);
-
-    if (enableBSDF) {
-        // vec3 refraction = pow(Cdlin, vec3(0.5)) * (1.0 - material.metallic) * material.transmission * (1.0 - F) * Ds * Gs * abs(VdotH) * jacbian * eta2 / abs(NdotV / NdotL);
-        vec3 refraction = pow(Cdlin, vec3(0.5)) * (1.0 - material.metallic) * material.transmission * (1.0 - F) * abs(VdotH) * jacbian * eta2 / abs(NdotV * NdotL);
-
-        diffuse = max(vec3(0), diffuse);
-        specular = max(vec3(0), specular);
-        clearcoat = max(vec3(0), clearcoat);
-        refraction = max(vec3(0), refraction);
-
-        // BSDF
-        // return refraction;
-        return (1.0 - material.metallic) * (1.0 - material.transmission) * diffuse + specular + clearcoat + refraction;
-    }
 
     // BRDF
      return (1.0 - material.metallic) * (1.0 - material.transmission) * diffuse + specular + clearcoat;
@@ -1058,11 +1041,17 @@ vec3 EvalSpecReflection(Material mat, float eta, vec3 specCol, vec3 V, vec3 L, v
     if (L.z <= 0.0)
     return vec3(0.0);
 
-    float FM = DisneyFresnel(mat, eta, dot(L, H), dot(V, H));
-    vec3 F = mix(specCol, vec3(1.0), FM);
-    float D = GTR2_Aniso(H.z, H.x, H.y, mat.ax, mat.ay);
-    float G1 = SmithG_GGX_Aniso(abs(V.z), V.x, V.y, mat.ax, mat.ay);
-    float G2 = G1 * SmithG_GGX_Aniso(abs(L.z), L.x, L.y, mat.ax, mat.ay);
+//    vec3    Cdlin   = mat.baseColor;
+//    float   Cdlum   = Luminance(Cdlin);
+//    vec3    Ctint   = (Cdlum > 0) ? (Cdlin/Cdlum) : (vec3(1));
+//    vec3    Cspec   = mat.specular * mix(vec3(1), Ctint, mat.specularTint);
+//    vec3    Cspec0  = mix(0.08 * Cspec, Cdlin, mat.metallic);  // 0° 镜面反射颜色
+
+    float   FM = DisneyFresnel(mat, eta, dot(L, H), dot(V, H));
+    vec3    F = mix(specCol, vec3(1.0), FM);
+    float   D = GTR2_Aniso(H.z, H.x, H.y, mat.ax, mat.ay);
+    float   G1 = SmithG_GGX_Aniso(abs(V.z), V.x, V.y, mat.ax, mat.ay);
+    float   G2 = G1 * SmithG_GGX_Aniso(abs(L.z), L.x, L.y, mat.ax, mat.ay);
 
     pdf = G1 * D / (4.0 * V.z);
     return F * D * G2 / (4.0 * L.z * V.z);
@@ -1112,13 +1101,13 @@ vec3 DisneyEval(Material material, vec3 V, vec3 N, vec3 L, out float bsdfPdf)
     bsdfPdf = 0.0;
     vec3 f = vec3(0.0);
 
+    float eta = dot(V, N) > 0.0 ? (1.0 / material.IOR) : material.IOR;
+
     // TODO: Tangent and bitangent should be calculated from mesh (provided, the mesh has proper uvs)
     vec3 T, B;
     getTangent(N, T, B);
     V = ToLocal(T, B, N, V); // NDotL = L.z; NDotV = V.z; NDotH = H.z
     L = ToLocal(T, B, N, L);
-
-    float eta = dot(V, N) > 0.0 ? (1.0 / material.IOR) : material.IOR;
 
     vec3 H;
     if (L.z > 0.0)
@@ -1180,12 +1169,12 @@ vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V,
     float r1 = xi_1;
     float r2 = xi_2;
 
+    float eta = dot(V, N) > 0.0 ? (1.0 / material.IOR) : material.IOR;
+
     // TODO: Tangent and bitangent should be calculated from mesh (provided, the mesh has proper uvs)
     vec3 T, B;
     getTangent(N, T, B);
     V = ToLocal(T, B, N, V); // NDotL = L.z; NDotV = V.z; NDotH = H.z
-
-    float eta = dot(V, N) > 0.0 ? (1.0 / material.IOR) : material.IOR;
 
     // Specular and sheen color
     vec3 specCol, sheenCol;
@@ -1273,9 +1262,7 @@ float BRDF_Pdf(vec3 V, vec3 N, vec3 L, in Material material) {
     float LdotH = dot(L, H);
     float VdotH = dot(V, H);
 
-    if(!enableBSDF) {
-        if(NdotL < 0 || NdotV < 0) return 0;
-    }
+    if(NdotL < 0 || NdotV < 0) return 0;
 
     // 根据辐射度计算概率
     float p_diffuse;
@@ -1337,10 +1324,11 @@ float hdrPdf(vec3 L, int hdrResolution) {
 
     float pdf = texture(hdrCache, uv).b;      // 采样概率密度
 
-    float theta = PI * (0.5 - uv.y);            // theta 范围 [-pi/2 ~ pi/2]
-    if(enableBSDF) {
-        theta = PI * uv.y;
-    }
+//     float theta = PI * (0.5 - uv.y);            // theta 范围 [-pi/2 ~ pi/2]
+    float theta = PI * uv.y;
+    //    if(enableBSDF) {
+    //        theta = PI * uv.y;
+    //    }
     float sin_theta = max(sin(theta), 1e-10);
 
     // 球坐标和图片积分域的转换系数
@@ -1361,8 +1349,7 @@ vec3 getDefaultSkyColor(float y) {
     return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
 }
 
-// 路径追踪着色
-// ----------
+
 vec3 shading(HitRecord hit) {
 
     vec3 Lo = vec3(0);
@@ -1409,14 +1396,12 @@ vec3 shading(HitRecord hit) {
     return Lo;
 }
 
-// 路径追踪着色-重要性采样
-// ----------
-vec3 shadingImportanceSampling(HitRecord hit) {
+vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
 
     vec3 Lo = vec3(0);
     vec3 history = vec3(1);
 
-    for (int i = 0; i < 40; i++) {
+    for (int i = 0; i < maxBounce; i++) {
 
         vec3 V = -hit.viewDir;
         vec3 N = hit.normal;
@@ -1501,14 +1486,12 @@ vec3 shadingImportanceSampling(HitRecord hit) {
     return Lo;
 }
 
-// 路径追踪着色-重要性采样
-// ----------
-vec3 shadingBSDFImportanceSampling(HitRecord hit) {
+vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
 
     vec3 Lo = vec3(0);
     vec3 history = vec3(1);
 
-    for (int i = 0; i < 50; i++) {
+    for (int i = 0; i < maxBounce; i++) {
 
         vec3 V = -hit.viewDir;
         vec3 N = hit.normal;
@@ -1529,21 +1512,15 @@ vec3 shadingBSDFImportanceSampling(HitRecord hit) {
                 vec3 skyColor = hdrColor(L);
                 float pdf_light = hdrPdf(L, hdrResolution);
                 float pdf_brdf;
-                vec3 f_r;
-                if (enableBSDF) {
-                    f_r = DisneyEval(hit.material, V, N, L, pdf_brdf);
-                }
-                else {
-                    f_r = BRDF_Evaluate(V, N, L, hit.material, pdf_brdf);
-                }
+                vec3 f_r = DisneyEval(hit.material, V, N, L, pdf_brdf);
 
                 if (enableMultiImportantSample) {
                     // 多重重要性采样
                     float mis_weight = misMixWeight(pdf_light, pdf_brdf);
-                    Lo += mis_weight * history * skyColor * f_r * abs(dot(N, L)) / pdf_light;
+                    Lo += mis_weight * history * skyColor * f_r  / pdf_light;
                 }
                 else {
-                    Lo += history * skyColor * f_r * abs(dot(N, L)) / pdf_light;
+                    Lo += history * skyColor * f_r / pdf_light;
                 }
             }
         }
@@ -1556,26 +1533,15 @@ vec3 shadingBSDFImportanceSampling(HitRecord hit) {
         float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
 
         // 采样 BRDF 得到一个方向 L
-        float pdf;
+        float pdf; // no use
         vec3 L = vec3(0.0, 1.0, 0.0);
-        if (enableBSDF) {
-            DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, pdf);
-        }
-        else {
-            L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
-        }
+        DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, pdf);
+
         float NdotL = dot(N, L);
 
         // 获取 L 方向上的 BRDF 值和概率密度
         float pdf_brdf;
-        vec3 f_r;
-
-        if (enableBSDF) {
-            f_r = DisneyEval(hit.material, V, N, L, pdf_brdf);
-        }
-        else {
-            f_r = BRDF_Evaluate(V, N, L, hit.material, pdf_brdf);
-        }
+        vec3 f_r = DisneyEval(hit.material, V, N, L, pdf_brdf);;
 
         if(pdf_brdf <= 0.0) break;
 
@@ -1595,26 +1561,26 @@ vec3 shadingBSDFImportanceSampling(HitRecord hit) {
                     // 多重重要性采样
                     float pdf_light = hdrPdf(L, hdrResolution);
                     float mis_weight = misMixWeight(pdf_brdf, pdf_light);// f(a,b) = a^2 / (a^2 + b^2)
-                    Lo += mis_weight * history * skyColor * f_r * abs(NdotL) / pdf_brdf;
+                    Lo += mis_weight * history * skyColor * f_r  / pdf_brdf;
                 }
                 else {
-                    Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
+                    Lo += history * skyColor * f_r / pdf_brdf;
                 }
             }
             else {
                 skyColor = getDefaultSkyColor(randomRay.direction.y);
-                Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
+                Lo += history * skyColor * f_r / pdf_brdf;
             }
             break;
         }
 
         // 命中
         vec3 Le = newHit.material.emissive;
-        Lo += history * Le * f_r * abs(NdotL) / pdf_brdf;
+        Lo += history * Le * f_r / pdf_brdf;
 
         // 递归(步进)
         hit = newHit;
-        history *= f_r * abs(NdotL) / pdf_brdf;  // 累积颜色
+        history *= f_r / pdf_brdf;  // 累积颜色
     }
     return Lo;
 }
@@ -1645,8 +1611,12 @@ void main() {
             vec3 Le = firstHit.material.emissive;
             vec3 Li = vec3(0);
             if(enableImportantSample) {
-//                Li = shadingImportanceSampling(firstHit);
-                Li = shadingBSDFImportanceSampling(firstHit);
+                if (enableBSDF) {
+                    Li = shadingImportanceSampling_BSDF(firstHit);
+                }
+                else {
+                    Li = shadingImportanceSampling_BRDF(firstHit);
+                }
             }
             else {
                 Li = shading(firstHit);
