@@ -146,6 +146,13 @@ int main() {
     jade.specular = 1.0;
     jade.subsurface = 1.0;
 
+    // Material jade_bsdf;
+    // jade.baseColor = vec3(0.55, 0.78, 0.55);
+    // jade.roughness = 0;
+    // jade.specular = 1.0;
+    // jade.subsurface = 1.0;
+    // jade.IOR = 1.0;
+
     Material golden;
     golden.baseColor = vec3(0.75, 0.7, 0.15);
     golden.roughness = 0.05;
@@ -167,24 +174,24 @@ int main() {
 
     // TODO GameObject
 
-    Material current_material = copper_bsdf;
+    Material current_material = jade;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
     getTriangle(floor.meshes, triangles, plane,
                 getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
 
-    // Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
-    // getTriangle(bunny.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
+    Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
+    getTriangle(bunny.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
 
     // Model sphere("../../resources/objects/sphere2.obj");
     // getTriangle(sphere.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0), vec3(2.2, -1, 3), vec3(2)), true);
 
-    Model loong("../../resources/objects/loong.obj");        // 100000 face
-    getTriangle(loong.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
+    // Model loong("../../resources/objects/loong.obj");        // 100000 face
+    // getTriangle(loong.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
 
     // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
     // Model dragon("../../resources/objects/dragon.obj");     // 831812 face

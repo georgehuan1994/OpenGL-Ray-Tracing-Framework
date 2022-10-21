@@ -382,8 +382,7 @@ void getTangent(vec3 N, inout vec3 tangent, inout vec3 bitangent) {
     tangent = normalize(cross(N, bitangent));
 }
 
-// Rendering the Moana Island Scene Part 1: Implemen…
-// https://schuttejoe.github.io/post/disneybsdf/
+// calculate tint from basecolor
 vec3 CalculateTint(vec3 baseColor)
 {
     // -- The color tint is never mentioned in the SIGGRAPH presentations as far as I recall but it was done in
@@ -392,6 +391,8 @@ vec3 CalculateTint(vec3 baseColor)
     return (luminance > 0.0) ? baseColor * (1.0 / luminance) : vec3(1.0);
 }
 
+// calculate specularcolor from baseColor/specularTint/metallic
+// calculate sheen color color form baseColor/sheenTint
 void GetSpecColor(Material mat, float eta, out vec3 specCol, out vec3 sheenCol)
 {
     float luminance = Luminance(mat.baseColor);
@@ -920,6 +921,7 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material)
     return diffuse * (1.0 - material.metallic) + specular + clearcoat;
 }
 
+// https://github.com/wdas/brdf/blob/master/src/brdfs/disney.brdf
 vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material, out float pdf) {
 
     pdf = 1e-10;
@@ -927,9 +929,7 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material, out float pdf) 
     float NdotL = dot(N, L);
     float NdotV = dot(N, V);
 
-    if(!enableBSDF) {
-        if(NdotL < 0 || NdotV < 0) return vec3(0);
-    }
+    if(NdotL < 0 || NdotV < 0) return vec3(0);
 
     vec3 H = normalize(L + V);
     float NdotH = dot(N, H);
@@ -944,31 +944,32 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material, out float pdf) 
     vec3    Cspec0  = mix(0.08 * Cspec, Cdlin, material.metallic);  // 0° 镜面反射颜色
     vec3    Csheen  = mix(vec3(1), Ctint, material.sheenTint);      // 织物颜色
 
-    // 漫反射 Diffuse
-    float Fd90 = 0.5 + 2.0 * LdotH * LdotH * material.roughness;
-    float FL = SchlickFresnel(NdotL);
-    float FV = SchlickFresnel(NdotV);
-    float Fd = mix(1.0, Fd90, FL) * mix(1.0, Fd90, FV);
+    // Diffuse fresnel - go from 1 at normal incidence to .5 at grazing
+    // and mix in diffuse retro-reflection based on roughness
+    float Fd90  = 0.5 + 2.0 * LdotH * LdotH * material.roughness;
+    float FL    = SchlickFresnel(NdotL);
+    float FV    = SchlickFresnel(NdotV);
+    float Fd    = mix(1.0, Fd90, FL) * mix(1.0, Fd90, FV);
 
-    // 伪次表面散射 Fake Subsurface TODO: Replace with volumetric scattering
+    // 伪次表面散射 Fake Subsurface
     float Fss90 = LdotH * LdotH * material.roughness;
-    float Fss = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV);
-    float ss = 1.25 * (Fss * (1.0 / (NdotL + NdotV) - 0.5) + 0.5);
+    float Fss   = mix(1.0, Fss90, FL) * mix(1.0, Fss90, FV);
+    float ss    = 1.25 * (Fss * (1.0 / (NdotL + NdotV) - 0.5) + 0.5);
 
     // 镜面反射 -- 各向同性
-    float FH = SchlickFresnel(LdotH);
+    float FH    = SchlickFresnel(LdotH);
     float alpha = max(0.001, sqr(material.roughness));
-    float   Ds = GTR2(NdotH, alpha);
-    vec3    Fs = mix(Cspec0, vec3(1), FH);
-    float   Gs = SmithG_GGX(NdotL, material.roughness);
-    Gs *= SmithG_GGX(NdotV, material.roughness);
+    float   Ds  = GTR2(NdotH, alpha);
+    vec3    Fs  = mix(Cspec0, vec3(1), FH);
+    float   Gs  = SmithG_GGX(NdotL, material.roughness);
+            Gs *= SmithG_GGX(NdotV, material.roughness);
 
     // 折射 Refraction
-    float eta = dot(V, N) > 0.0 ? (1.0 / material.IOR) : material.IOR;
-    float F = DielectricFresnel(abs(VdotH), eta);
+    float eta   = dot(V, N) > 0.0 ? (1.0 / material.IOR) : material.IOR;
+    float F     = DielectricFresnel(abs(VdotH), eta);
     float denom = LdotH + VdotH * eta;
-    denom *= denom;
-    float eta2 = eta * eta;
+          denom *= denom;
+    float eta2  = eta * eta;
     float jacbian = abs(LdotH) / denom;
 
     // 清漆 Clearcoat
@@ -983,9 +984,6 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, in Material material, out float pdf) 
     vec3 diffuse = INV_PI * mix(Fd, ss, material.subsurface) * Cdlin + Fsheen;
     vec3 specular = Gs * Fs * Ds;
     vec3 clearcoat = vec3(0.25) * Gr * Fr * Dr * material.clearcoat;
-    // vec3 diffuse = (1.0 - mat.metallic) * (1.0 - mat.specTrans) * (INV_PI * mix(Fd, ss, mat.subsurface) * mat.baseColor + Fsheen);
-    // vec3 specular = Gs * Fs * Ds / (4.0 * NdotL * NdotV);
-    // vec3 clearcoat = vec3(0.25) * mat.clearcoat * F * D * G / (4.0 * NdotL * NdotV);
 
     // 根据辐射度计算概率
     float p_diffuse;
@@ -1041,17 +1039,11 @@ vec3 EvalSpecReflection(Material mat, float eta, vec3 specCol, vec3 V, vec3 L, v
     if (L.z <= 0.0)
     return vec3(0.0);
 
-//    vec3    Cdlin   = mat.baseColor;
-//    float   Cdlum   = Luminance(Cdlin);
-//    vec3    Ctint   = (Cdlum > 0) ? (Cdlin/Cdlum) : (vec3(1));
-//    vec3    Cspec   = mat.specular * mix(vec3(1), Ctint, mat.specularTint);
-//    vec3    Cspec0  = mix(0.08 * Cspec, Cdlin, mat.metallic);  // 0° 镜面反射颜色
-
-    float   FM = DisneyFresnel(mat, eta, dot(L, H), dot(V, H));
-    vec3    F = mix(specCol, vec3(1.0), FM);
-    float   D = GTR2_Aniso(H.z, H.x, H.y, mat.ax, mat.ay);
-    float   G1 = SmithG_GGX_Aniso(abs(V.z), V.x, V.y, mat.ax, mat.ay);
-    float   G2 = G1 * SmithG_GGX_Aniso(abs(L.z), L.x, L.y, mat.ax, mat.ay);
+    float   FM  = DisneyFresnel(mat, eta, dot(L, H), dot(V, H)); // SchlickFresnel(dot(L, H));
+    vec3    F   = mix(specCol, vec3(1.0), FM); // mix(Cspec0, vec3(1), FM);
+    float   D   = GTR2_Aniso(H.z, H.x, H.y, mat.ax, mat.ay);
+    float   G1  = SmithG_GGX_Aniso(abs(V.z), V.x, V.y, mat.ax, mat.ay);
+    float   G2  = G1 * SmithG_GGX_Aniso(abs(L.z), L.x, L.y, mat.ax, mat.ay);
 
     pdf = G1 * D / (4.0 * V.z);
     return F * D * G2 / (4.0 * L.z * V.z);
@@ -1448,6 +1440,8 @@ vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
         vec3 f_r = BRDF_Evaluate(V, N, L, hit.material, pdf_brdf);
         if(pdf_brdf <= 0.0) break;
 
+        history *= f_r * abs(NdotL) / pdf_brdf;  // 累积颜色
+
         // 漫反射: 随机发射光线
         Ray randomRay;
         randomRay.origin = hit.hitPoint;
@@ -1481,7 +1475,7 @@ vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
 
         // 递归(步进)
         hit = newHit;
-        history *= f_r * abs(NdotL) / pdf_brdf;  // 累积颜色
+        // history *= f_r * abs(NdotL) / pdf_brdf;  // 累积颜色
     }
     return Lo;
 }
@@ -1532,18 +1526,28 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
         float xi_2 = uv.y;
         float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
 
-        // 采样 BRDF 得到一个方向 L
-        float pdf; // no use
-        vec3 L = vec3(0.0, 1.0, 0.0);
-        DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, pdf);
+        // 采样得到：概率密度、辐射度、出射方向 L
+        float disney_sample_pdf    = 0.0;
+        vec3  disney_sample_fr     = vec3(0);
+        vec3  L                    = vec3(0);
+        disney_sample_fr = DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, disney_sample_pdf);
 
-        float NdotL = dot(N, L);
+        if (disney_sample_pdf > 0.0) {
+            history *= disney_sample_fr / disney_sample_pdf;  // 累积颜色
+        }
+        else {
+            break;
+        }
 
-        // 获取 L 方向上的 BRDF 值和概率密度
-        float pdf_brdf;
-        vec3 f_r = DisneyEval(hit.material, V, N, L, pdf_brdf);;
+        // float NdotL = dot(N, L);
 
-        if(pdf_brdf <= 0.0) break;
+        // 获取 L 方向上的概率密度和辐射度
+        float disney_eval_pdf     = 0.0;
+        vec3  disney_eval_fr      = vec3(0);
+        disney_eval_fr = DisneyEval(hit.material, V, N, L, disney_eval_pdf);
+
+        // if(disney_eval_pdf <= 0.0) break;
+        // history *= disney_eval_fr / disney_eval_pdf;  // 累积颜色
 
         // 漫反射: 随机发射光线
         Ray randomRay;
@@ -1560,27 +1564,27 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
                 if (enableMultiImportantSample) {
                     // 多重重要性采样
                     float pdf_light = hdrPdf(L, hdrResolution);
-                    float mis_weight = misMixWeight(pdf_brdf, pdf_light);// f(a,b) = a^2 / (a^2 + b^2)
-                    Lo += mis_weight * history * skyColor * f_r  / pdf_brdf;
+                    float mis_weight = misMixWeight(disney_eval_pdf, pdf_light);    // f(a,b) = a^2 / (a^2 + b^2)
+                    Lo += mis_weight * history * skyColor * disney_eval_fr  / disney_eval_pdf;
                 }
                 else {
-                    Lo += history * skyColor * f_r / pdf_brdf;
+                    Lo += history * skyColor * disney_eval_fr / disney_eval_pdf;
                 }
             }
             else {
                 skyColor = getDefaultSkyColor(randomRay.direction.y);
-                Lo += history * skyColor * f_r / pdf_brdf;
+                Lo += history * skyColor * disney_eval_fr / disney_eval_pdf;
             }
             break;
         }
 
         // 命中
         vec3 Le = newHit.material.emissive;
-        Lo += history * Le * f_r / pdf_brdf;
+        Lo += history * Le * disney_eval_fr / disney_eval_pdf;
 
         // 递归(步进)
         hit = newHit;
-        history *= f_r / pdf_brdf;  // 累积颜色
+        // history *= disney_eval_fr / disney_eval_pdf;  // 累积颜色
     }
     return Lo;
 }
