@@ -131,8 +131,8 @@ int main() {
 
     Material plane;
     plane.baseColor = vec3(0.73, 0.73, 0.73);
-    plane.roughness = 0.1;
     plane.specular = 1.0;
+    plane.IOR = 1.79;        // bsdf specular
     plane.metallic = 0.2;
 
     Material white;
@@ -142,16 +142,9 @@ int main() {
 
     Material jade;
     jade.baseColor = vec3(0.55, 0.78, 0.55);
-    jade.roughness = 0.1;
     jade.specular = 1.0;
+    jade.IOR = 1.79;
     jade.subsurface = 1.0;
-
-    // Material jade_bsdf;
-    // jade.baseColor = vec3(0.55, 0.78, 0.55);
-    // jade.roughness = 0;
-    // jade.specular = 1.0;
-    // jade.subsurface = 1.0;
-    // jade.IOR = 1.0;
 
     Material golden;
     golden.baseColor = vec3(0.75, 0.7, 0.15);
@@ -161,8 +154,8 @@ int main() {
 
     Material copper_bsdf;
     copper_bsdf.baseColor = vec3(238.0f/255.0f, 158.0f/255.0f, 137.0f/255.0f);
-    golden.roughness = 0.05;
-    golden.specular = 1.0;
+    copper_bsdf.roughness = 0.05;
+    copper_bsdf.specular = 1.0;
     copper_bsdf.IOR = 1.21901;
     copper_bsdf.metallic = 1.0;
 
@@ -174,20 +167,20 @@ int main() {
 
     // TODO GameObject
 
-    Material current_material = jade;
+    Material current_material = glass;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
     getTriangle(floor.meshes, triangles, plane,
                 getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
 
-    Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
-    getTriangle(bunny.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
+    // Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
+    // getTriangle(bunny.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
 
-    // Model sphere("../../resources/objects/sphere2.obj");
-    // getTriangle(sphere.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2.2, -1, 3), vec3(2)), true);
+    Model sphere("../../resources/objects/sphere2.obj");
+    getTriangle(sphere.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0), vec3(2.2, -1, 3), vec3(2)), true);
 
     // Model loong("../../resources/objects/loong.obj");        // 100000 face
     // getTriangle(loong.meshes, triangles, current_material,
@@ -307,7 +300,6 @@ int main() {
 
     // Render Setting
     bool show_demo_window = false;
-    bool enableImportantSample = true;
     bool enableMultiImportantSample = true;
     bool enableEnvMap = true;
     bool enableToneMapping = true;
@@ -347,9 +339,6 @@ int main() {
         ImGui::Text("WASDQE: move the camera");
         ImGui::Separator();
         if (ImGui::Checkbox("Enable HDR EnvMap", &enableEnvMap)) {
-            camera.LoopNum = 0;
-        }
-        if (ImGui::Checkbox("Enable Important Sampling", &enableImportantSample)) {
             camera.LoopNum = 0;
         }
         if (ImGui::Checkbox("Enable Multi-Important Sampling", &enableMultiImportantSample)) {
@@ -418,7 +407,7 @@ int main() {
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;
         }
-        if (ImGui::SliderFloat("Specular Tine", &specularTint, 0.0f, 1.0f)) {
+        if (ImGui::SliderFloat("Specular Tint", &specularTint, 0.0f, 1.0f)) {
             current_material.specularTint = specularTint;
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;
@@ -502,7 +491,6 @@ int main() {
             RayTracerShader.setFloat("randOrigin", 674764.0f * (GetCPURandom() + 1.0f));
             RayTracerShader.setInt("screenWidth", width);
             RayTracerShader.setInt("screenHeight", height);
-            RayTracerShader.setBool("enableImportantSample", enableImportantSample);
             RayTracerShader.setBool("enableMultiImportantSample", enableMultiImportantSample);
             RayTracerShader.setBool("enableEnvMap", enableEnvMap);
             RayTracerShader.setInt("maxBounce", maxBounce);
