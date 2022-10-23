@@ -43,7 +43,7 @@ static float sheen = 0.0f;
 static float sheenTint = 0.0f;
 static float clearcoat = 0.0f;
 static float clearcoatGloss = 0.0f;
-static float IOR = 1.0f;
+static float IOR = 1.5f;
 static float transmission = 0.0f;
 
 void SetGlobalMaterialProperty(Material material) {

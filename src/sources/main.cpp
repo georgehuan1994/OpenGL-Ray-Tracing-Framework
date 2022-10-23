@@ -164,23 +164,35 @@ int main() {
     glass.specular = 1.0;
     glass.transmission = 1.0;
     glass.IOR = 1.5;
+    glass.roughness = 0.02;
+
+    Material purple_glass;
+    purple_glass.baseColor = vec3(0.085, 0.917, 0.848);
+    purple_glass.specular = 1.0;
+    purple_glass.transmission = 1.0;
+    purple_glass.IOR = 1.5;
+    purple_glass.roughness = 0.02;
 
     // TODO GameObject
 
-    Material current_material = glass;
+    Material current_material = jade;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
     getTriangle(floor.meshes, triangles, plane,
-                getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
+                getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7, 7)), false);
 
-//     Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
-//     getTriangle(bunny.meshes, triangles, current_material,
-//                 getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
+    Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
+    getTriangle(bunny.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
 
-    Model sphere("../../resources/objects/glassball.obj");
-    getTriangle(sphere.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0,0,0), vec3(2.2, -1, 3), vec3(2)), true);
+//    Model teapot("../../resources/objects/renderman/teapot.obj");
+//    getTriangle(teapot.meshes, triangles, current_material,
+//                getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
+
+//    Model sphere("../../resources/objects/glassball.obj");
+//    getTriangle(sphere.meshes, triangles, current_material,
+//                getTransformMatrix(vec3(0,0,0), vec3(2.2, -1, 3), vec3(2)), true);
 
 //     Model loong("../../resources/objects/loong.obj");        // 100000 face
 //     getTriangle(loong.meshes, triangles, current_material,
@@ -402,10 +414,12 @@ int main() {
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;
         }
-        if (ImGui::SliderFloat("Specular", &specular, 0.0f, 1.0f)) {
-            current_material.specular = specular;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
+        if (!enableBSDF) {
+            if (ImGui::SliderFloat("Specular", &specular, 0.0f, 1.0f)) {
+                current_material.specular = specular;
+                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+                camera.LoopNum = 0;
+            }
         }
         if (ImGui::SliderFloat("Specular Tint", &specularTint, 0.0f, 1.0f)) {
             current_material.specularTint = specularTint;
@@ -442,15 +456,17 @@ int main() {
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;
         }
-        if (ImGui::SliderFloat("IOR", &IOR, 0.001f, 2.45f)) {
-            current_material.IOR = IOR;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderFloat("Transmission", &transmission, 0.0f, 1.0f)) {
-            current_material.transmission = transmission;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
+        if (enableBSDF) {
+            if (ImGui::SliderFloat("IOR", &IOR, 0.001f, 2.45f)) {
+                current_material.IOR = IOR;
+                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+                camera.LoopNum = 0;
+            }
+            if (ImGui::SliderFloat("Transmission", &transmission, 0.0f, 1.0f)) {
+                current_material.transmission = transmission;
+                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+                camera.LoopNum = 0;
+            }
         }
 
         ImGui::End();
