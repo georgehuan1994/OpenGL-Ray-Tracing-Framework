@@ -13,6 +13,11 @@
 #define SIZE_TRIANGLE   12
 #define SIZE_BVHNODE    4
 
+#define MEDIUM_NONE 0
+#define MEDIUM_ABSORB 1
+#define MEDIUM_SCATTER 2
+#define MEDIUM_EMISSIVE 3
+
 // ============== struct ===============
 
 // triangle data
@@ -30,6 +35,14 @@ struct BVHNode {
     int n;              // triangle count
     int index;          // triangle index
     vec3 AA, BB;        // AABB Min and Max position
+};
+
+struct Medium           // TODO: Add Medium Params
+{
+    int     type;
+    float   density;
+    vec3    color;
+    float   anisotropy;
 };
 
 // material params
@@ -52,6 +65,8 @@ struct Material {
 
     float   ax;
     float   ay;
+
+    Medium medium;
 };
 
 // camera params
@@ -256,17 +271,19 @@ HitRecord hitTriangle(Triangle triangle, Ray ray) {
     bool r2 = (dot(c1, N) < 0 && dot(c2, N) < 0 && dot(c3, N) < 0);
 
     if (r1 || r2) {
-        rec.isHit = true;
-        rec.hitPoint = P;
-        rec.distance = t - 0.00001;
-        rec.viewDir = d;
+        rec.isHit       = true;
+        rec.hitPoint    = P;
+        rec.distance    = t - 0.00001;
+        rec.viewDir     = d;
+        rec.normal      = N;
 
         // smooth normal
-        float alpha = (-(P.x-p2.x)*(p3.y-p2.y) + (P.y-p2.y)*(p3.x-p2.x)) / (-(p1.x-p2.x-0.00005)*(p3.y-p2.y+0.00005) + (p1.y-p2.y+0.00005)*(p3.x-p2.x+0.00005));
-        float beta  = (-(P.x-p3.x)*(p1.y-p3.y) + (P.y-p3.y)*(p1.x-p3.x)) / (-(p2.x-p3.x-0.00005)*(p1.y-p3.y+0.00005) + (p2.y-p3.y+0.00005)*(p1.x-p3.x+0.00005));
-        float gama  = 1.0 - alpha - beta;
-        vec3 Nsmooth = alpha * triangle.n1 + beta * triangle.n2 + gama * triangle.n3;
-             Nsmooth = normalize(Nsmooth);
+        float   alpha   = (-(P.x-p2.x)*(p3.y-p2.y) + (P.y-p2.y)*(p3.x-p2.x)) / (-(p1.x-p2.x)*(p3.y-p2.y) + (p1.y-p2.y)*(p3.x-p2.x)+1e-7);
+        float   beta    = (-(P.x-p3.x)*(p1.y-p3.y) + (P.y-p3.y)*(p1.x-p3.x)) / (-(p2.x-p3.x)*(p1.y-p3.y) + (p2.y-p3.y)*(p1.x-p3.x)+1e-7);
+        float   gama    = 1.0 - alpha - beta;
+        vec3    Nsmooth = alpha * triangle.n1 + beta * triangle.n2 + gama * triangle.n3;
+                Nsmooth = normalize(Nsmooth);
+
         rec.normal = (rec.isInside) ? (-Nsmooth) : (Nsmooth);
     }
 
@@ -665,6 +682,14 @@ vec3 SampleCosineHemisphere(float xi_1, float xi_2, vec3 N) {
     // 从 z 半球投影到法向半球
     vec3 L = toNormalHemisphere(vec3(x, y, z), N);
     return L;
+}
+
+vec3 UniformSampleSphere(float r1, float r2)
+{
+    float z = 1.0 - 2.0 * r1;
+    float r = sqrt(max(0.0, 1.0 - z * z));
+    float phi = TWO_PI * r2;
+    return vec3(r * cos(phi), r * sin(phi), z);
 }
 
 // GTR1 重要性采样
@@ -1096,7 +1121,7 @@ vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V,
     {
         r1 /= cdf[0];
         L = CosineSampleHemisphere(r1, r2);
-        // L = SampleCosineHemisphere(xi_1, xi_2, N);
+        // L = SampleCosineHemisphere(xi_1, xi_2, N); // Error
 
         vec3 H = normalize(L + V);
 
@@ -1141,7 +1166,8 @@ vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V,
             L = normalize(refract(-V, H, eta));
 
             f = EvalSpecRefraction(material, eta, V, L, H, pdf);
-            pdf *= 1.0 - F;
+            // pdf *= F;
+            pdf *= (1.0 - F);
         }
 
         pdf *= specReflectWt + specRefractWt;
@@ -1151,9 +1177,8 @@ vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V,
     return f * abs(dot(N, L));
 }
 
-
-
-// 获取 HDR 环境颜色
+// Sample HDR Environment Color with L
+// -----------------------------------
 vec3 hdrColor(vec3 L) {
     vec2 uv = toSphericalCoord(normalize(L));
     vec3 color = texture(hdrMap, uv).rgb;
@@ -1167,7 +1192,7 @@ float hdrPdf(vec3 L, int hdrResolution) {
 
     float pdf = texture(hdrCache, uv).b;      // 采样概率密度
 
-//     float theta = PI * (0.5 - uv.y);            // theta 范围 [-pi/2 ~ pi/2]
+    // float theta = PI * (0.5 - uv.y);            // theta 范围 [-pi/2 ~ pi/2]
     float theta = PI * uv.y;
     float sin_theta = max(sin(theta), 1e-10);
 
@@ -1177,18 +1202,107 @@ float hdrPdf(vec3 L, int hdrResolution) {
     return pdf * p_convert;
 }
 
-float misMixWeight(float a, float b) {
-    float t = a * a;
-    return t / (b*b + t);
-}
-
-// 默认天空盒
-// --------
+// Default Sky Color
+// -----------------
 vec3 getDefaultSkyColor(float y) {
     float t = 0.5 * (y + 1.0);
     return (1.0 - t) * vec3(1.0, 1.0, 1.0) + t * vec3(0.5, 0.7, 1.0);
 }
 
+vec3 SampleHG(vec3 V, float g, float r1, float r2)
+{
+    float cosTheta;
+
+    if (abs(g) < 0.001)
+    cosTheta = 1 - 2 * r2;
+    else
+    {
+        float sqrTerm = (1 - g * g) / (1 + g - 2 * g * r2);
+        cosTheta = -(1 + g * g - sqrTerm * sqrTerm) / (2 * g);
+    }
+
+    float phi = r1 * TWO_PI;
+    float sinTheta = clamp(sqrt(1.0 - (cosTheta * cosTheta)), 0.0, 1.0);
+    float sinPhi = sin(phi);
+    float cosPhi = cos(phi);
+
+    vec3 v1, v2;
+    getTangent(V, v1, v2);
+
+    return sinTheta * cosPhi * v1 + sinTheta * sinPhi * v2 + cosTheta * V;
+}
+
+float PhaseHG(float cosTheta, float g)
+{
+    float denom = 1 + g * g + 2 * g * cosTheta;
+    return INV_4_PI * (1 - g * g) / (denom * sqrt(denom));
+}
+
+vec3 EvalTransmittance(Ray r)
+{
+    // LightSampleRec lightSample;
+    // State state;
+
+    HitRecord hitRec;
+
+    vec3 transmittance = vec3(1);
+
+    for (int depth = 0; depth < maxBounce; depth++)
+    {
+        // bool isHit = ClosestHit(r, state, lightSample);
+        hitRec = hitBVH(r);
+
+        // If no hit (environment map) or if ray hit a light source then return transmittance
+        if (!hitRec.isHit)// || state.isEmitter)
+        {
+//            if (depth == 0) {
+//                transmittance = vec3(1.0, 0.0, 0.0);
+//            }
+//            else {
+//                transmittance = vec3(0.0, 1.0, 0.0);
+////                transmittance *= hdrColor(r.direction);
+//            }
+            transmittance *= hdrColor(r.direction);
+            break;
+        }
+
+        // TODO: Get only parameters that are needed to calculate transmittance
+        // GetMaterial(state, r);
+
+        Material mat = hitRec.material;
+
+        // bool alphatest = (state.mat.alphaMode == ALPHA_MODE_MASK && state.mat.opacity < state.mat.alphaCutoff) || (state.mat.alphaMode == ALPHA_MODE_BLEND && rand() > state.mat.opacity);
+        bool refractive = (1.0 - mat.metallic) * mat.transmission > 0.0;
+
+        // Refraction is ignored (Not physically correct but helps with sampling lights from inside refractive objects)
+        if(hitRec.isHit && !(/*alphatest ||*/ refractive))
+        return vec3(0);
+
+        // Evaluate transmittance
+        if (true /*hitRec.isInside*/ /*dot(r.direction, hitRec.normal) > 0 && mat.medium.type != MEDIUM_NONE*/)
+        {
+            vec3 color = vec3(1.0);//mat.medium.type == MEDIUM_ABSORB ? vec3(1.0) - mat.medium.color : vec3(1.0);
+            // transmittance *= exp(-color * mat.medium.density * hitRec.distance);
+            transmittance *= exp(-color * 0.5 * hitRec.distance);
+//            transmittance = vec3(0.0, 0.0, 1.0);
+        }
+//        else {
+//            transmittance = vec3(0.0, 0.0, 1.0);
+//        }
+
+        // Move ray origin to hit point
+        r.origin = hitRec.hitPoint + r.direction * EPS;
+    }
+
+    return transmittance;
+}
+
+// Mix Pdf
+// -------
+float misMixWeight(float a, float b) {
+    float t = a * a;
+    return t / (b*b + t);
+}
 
 vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
 
@@ -1313,15 +1427,34 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
                 float pdf_brdf;
                 vec3 f_r = DisneyEval(hit.material, V, N, L, pdf_brdf);
 
+                // skyColor *= EvalTransmittance(hdrTestRay);
+
                 if (enableMultiImportantSample) {
                     // 多重重要性采样
                     float mis_weight = misMixWeight(pdf_light, pdf_brdf);
-                    Lo += mis_weight * history * skyColor * f_r  / pdf_light;
+                    Lo += mis_weight * history * skyColor * f_r / pdf_light;
                 }
                 else {
                     Lo += history * skyColor * f_r / pdf_light;
                 }
             }
+        }
+        else {
+            Ray testRay;
+            testRay.origin = hit.hitPoint;
+            testRay.direction = UniformSampleSphere(rand(), rand());
+
+            // testRay = hdrTestRay;
+
+            vec3 Li = EvalTransmittance(testRay);
+            float pdf_light = hdrPdf(testRay.direction, hdrResolution);
+
+            float p = PhaseHG(dot(-hit.viewDir, testRay.direction), 0.5);
+            vec3 scatterSample_f = vec3(p);
+            float scatterSample_pdf = p;
+
+            if (scatterSample_pdf >0.0)
+            Lo += history * Li * scatterSample_f / pdf_light;
         }
 
         // 获取 3 个随机数
@@ -1394,6 +1527,110 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
     return Lo;
 }
 
+vec3 shadingImportanceSampling_BSDF_Test(HitRecord hit) {
+
+    vec3 Lo = vec3(0);
+    vec3 history = vec3(1);
+
+    for (int i = 0; i < maxBounce; i++) {
+
+        vec3 V = -hit.viewDir;
+        vec3 N = hit.normal;
+
+        // Random Sample HDR Environment Map
+        Ray hdrTestRay;
+        hdrTestRay.origin       = hit.hitPoint;
+        hdrTestRay.direction    = SampleHdr(rand(), rand());
+
+        // Surface
+        if(dot(N, hdrTestRay.direction) > 0.0) {
+            HitRecord hdrHit = hitBVH(hdrTestRay);
+
+            // Hit HDR Map
+            if(!hdrHit.isHit) {
+                vec3 L = hdrTestRay.direction;
+
+                float   light_pdf   = hdrPdf(L, hdrResolution);
+                vec3    light_fr    = hdrColor(L);
+
+                float   disney_eval_pdf;
+                vec3    disney_eval_fr = DisneyEval(hit.material, V, N, L, disney_eval_pdf);
+
+                float   mis_weight = misMixWeight(light_pdf, disney_eval_pdf);
+
+                if (!enableMultiImportantSample) {
+                    mis_weight = 1.0;
+                }
+
+                Lo += mis_weight * history * light_fr * disney_eval_fr / light_pdf;
+            }
+        }
+        // TODO: InMeduie
+
+        // sobol random
+        vec2    uv = sobolVec2(camera.loopNum + 1, i);
+                uv = CranleyPattersonRotation(uv);
+
+        float xi_1 = uv.x;
+        float xi_2 = uv.y;
+        float xi_3 = rand();
+
+        float disney_sample_pdf    = 0.0;
+        vec3  disney_sample_fr     = vec3(0);
+        vec3  L                    = vec3(0);
+        disney_sample_fr = DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, disney_sample_pdf);
+
+        // Cumulative the Color
+        if (disney_sample_pdf > 0.0) {
+            history *= disney_sample_fr / disney_sample_pdf;
+        }
+        else {
+            break;
+        }
+
+        // Next Hit
+        float disney_eval_pdf     = 0.0;
+        vec3  disney_eval_fr      = vec3(0);
+        disney_eval_fr = DisneyEval(hit.material, V, N, L, disney_eval_pdf);
+
+        Ray randomRay;
+        randomRay.origin        = hit.hitPoint;
+        randomRay.direction     = L;
+
+        HitRecord nextHit       = hitBVH(randomRay);
+
+        // Next Hit HDR Map
+        if(!nextHit.isHit) {
+            vec3 light_fr = vec3(0);
+            if(enableEnvMap) {
+                light_fr = hdrColor(L);
+
+                float light_pdf = hdrPdf(L, hdrResolution);
+                float mis_weight = misMixWeight(disney_eval_pdf, light_pdf);
+
+                if (!enableMultiImportantSample) {
+                    mis_weight = 1.0;
+                }
+
+                Lo += mis_weight * history * light_fr * disney_eval_fr / disney_eval_pdf;
+            }
+            else {
+                light_fr = getDefaultSkyColor(randomRay.direction.y);
+                Lo += history * light_fr * disney_eval_fr / disney_eval_pdf;
+            }
+            break;
+        }
+
+        // Next Hit Emisstive
+        vec3 Le = nextHit.material.emissive;
+        Lo += history * Le * disney_eval_fr / disney_eval_pdf;
+
+        // Recursion
+        hit = nextHit;
+    }
+    return Lo;
+}
+
 void main() {
 
     wseed = uint(randOrigin * float(6.95857) * (TexCoords.x * TexCoords.y));
@@ -1420,7 +1657,8 @@ void main() {
             vec3 Le = firstHit.material.emissive;
             vec3 Li = vec3(0);
             if (enableBSDF) {
-                Li = shadingImportanceSampling_BSDF(firstHit);
+//                Li = shadingImportanceSampling_BSDF(firstHit);
+                Li = shadingImportanceSampling_BSDF_Test(firstHit);
             }
             else {
                 Li = shadingImportanceSampling_BRDF(firstHit);

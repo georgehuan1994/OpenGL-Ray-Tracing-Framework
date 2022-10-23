@@ -31,7 +31,7 @@ struct Triangle_encoded {
     glm::vec3 param4;        // (clearcoatGloss, IOR, transmission)
 };
 
-void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Material material, mat4 trans, bool smoothNormal) {
+void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Material material, mat4 trans, bool smoothNormal = false) {
     // 顶点位置，索引
     std::vector<vec3> vertices;
     std::vector<vec3> normals;

@@ -174,22 +174,22 @@ int main() {
     getTriangle(floor.meshes, triangles, plane,
                 getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7 ,7)), false);
 
-    // Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
-    // getTriangle(bunny.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
+//     Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
+//     getTriangle(bunny.meshes, triangles, current_material,
+//                 getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
 
-    Model sphere("../../resources/objects/sphere2.obj");
+    Model sphere("../../resources/objects/glassball.obj");
     getTriangle(sphere.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0), vec3(2.2, -1, 3), vec3(2)), true);
+                getTransformMatrix(vec3(0,0,0), vec3(2.2, -1, 3), vec3(2)), true);
 
-    // Model loong("../../resources/objects/loong.obj");        // 100000 face
-    // getTriangle(loong.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
+//     Model loong("../../resources/objects/loong.obj");        // 100000 face
+//     getTriangle(loong.meshes, triangles, current_material,
+//                 getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), false);
 
-    // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
-    // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
-    // getTriangle(dragon.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
+//     camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
+//     Model dragon("../../resources/objects/dragon.obj");     // 831812 face
+//     getTriangle(dragon.meshes, triangles, current_material,
+//                 getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
 
 #pragma endregion
 
