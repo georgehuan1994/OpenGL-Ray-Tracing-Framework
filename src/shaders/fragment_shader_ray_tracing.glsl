@@ -427,17 +427,17 @@ void CalculateAnisotropicParams(float roughness, float anisotropic, out float ax
 
 // Normal Distribution: Generalized-Trowbridge-Reitz, γ=1, Berry
 // -------------------------------------------------------------
-float GTR1(float NdotH, float a) {
+float GTR1(float NdotH, float alpha) {
     if (a >= 1) return INV_PI;
-    float a2 = a * a;
+    float a2 = alpha * alpha;
     float t = 1 + (a2 - 1) * NdotH * NdotH;
     return (a2 - 1) / (PI * log(a2) * t);
 }
 
 // Normal Distribution: Generalized-Trowbridge-Reitz, γ=2, Trowbridge-Reitz
 // -------------------------------------------------------------
-float GTR2(float NdotH, float a) {
-    float a2 = a * a;
+float GTR2(float NdotH, float alpha) {
+    float a2 = alpha * alpha;
     float t = 1 + (a2 - 1) * NdotH * NdotH;
     return a2 / (PI * t * t);
 }
@@ -454,7 +454,7 @@ float GTR2_Aniso(float NdotH, float HdotX, float HdotY, float ax, float ay) {
 float SmithG_GGX(float NdotV, float alphaG) {
     float a = alphaG * alphaG;
     float b = NdotV * NdotV;
-    return (2.0 * NdotV) / (NdotV + sqrt(a + b - a * b));
+    // return (2.0 * NdotV) / (NdotV + sqrt(a + b - a * b));
     return 1.0           / (NdotV + sqrt(a + b - a * b));
 }
 
