@@ -428,7 +428,7 @@ void CalculateAnisotropicParams(float roughness, float anisotropic, out float ax
 // Normal Distribution: Generalized-Trowbridge-Reitz, γ=1, Berry
 // -------------------------------------------------------------
 float GTR1(float NdotH, float alpha) {
-    if (a >= 1) return INV_PI;
+    if (alpha >= 1) return INV_PI;
     float a2 = alpha * alpha;
     float t = 1 + (a2 - 1) * NdotH * NdotH;
     return (a2 - 1) / (PI * log(a2) * t);
@@ -449,13 +449,13 @@ float GTR2_Aniso(float NdotH, float HdotX, float HdotY, float ax, float ay) {
     return 1.0 / (PI * ax * ay * c * c);
 }
 
-// Geometry
+// Geometry - Clearcoat
 // --------
 float SmithG_GGX(float NdotV, float alphaG) {
     float a = alphaG * alphaG;
     float b = NdotV * NdotV;
-    // return (2.0 * NdotV) / (NdotV + sqrt(a + b - a * b));
     return 1.0           / (NdotV + sqrt(a + b - a * b));
+    return (2.0 * NdotV) / (NdotV + sqrt(a + b - a * b));
 }
 
 // Geometry
@@ -989,7 +989,7 @@ vec3 EvalClearcoat(Material mat, vec3 V, vec3 L, vec3 H, out float pdf)
 
     float FH = DielectricFresnel(dot(V, H), 1.0 / 1.5);
     float F = mix(0.04, 1.0, FH);
-    float D = GTR1(H.z, mat.clearcoatGloss);
+    float D = GTR1(H.z, mat.clearcoatGloss); // float D = GTR1(H.z, mix(0.1, 0.001, mat.clearcoatGloss));
     float G = SmithG_GGX(L.z, 0.25) * SmithG_GGX(V.z, 0.25);
     float jacobian = 1.0 / (4.0 * dot(V, H));
 
