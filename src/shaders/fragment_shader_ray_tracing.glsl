@@ -245,19 +245,19 @@ HitRecord hitTriangle(Triangle triangle, Ray ray) {
     vec3 N = normalize(cross(p2-p1, p3-p1));
 
     // hit from behind the triangle (inside the model)
-    if (dot(N, d) > 0.0f) {
+    if (dot(N, d) > 0.0) {
         N = -N;
         rec.isInside = true;
     }
 
     // if the line of sight is parallel to the triangle
-    if (abs(dot(N, d)) < 0.00001f) return rec;
+    if (abs(dot(N, d)) < 0.00001) return rec;
 
     // distance
     float t = (dot(N, p1) - dot(S, N)) / dot(d, N);
 
     // if the triangle is on the back of the ray
-    if (t < 0.0005f) return rec;
+    if (t < 0.0005) return rec;
 
     // hit point in the plane of triangle
     vec3 P = S + d * t;
@@ -454,8 +454,8 @@ float GTR2_Aniso(float NdotH, float HdotX, float HdotY, float ax, float ay) {
 float SmithG_GGX(float NdotV, float alphaG) {
     float a = alphaG * alphaG;
     float b = NdotV * NdotV;
-    return 1.0           / (NdotV + sqrt(a + b - a * b));
     return (2.0 * NdotV) / (NdotV + sqrt(a + b - a * b));
+    return 1.0           / (NdotV + sqrt(a + b - a * b));
 }
 
 // Geometry
@@ -1065,10 +1065,11 @@ vec3 DisneyEval(Material material, vec3 V, vec3 N, vec3 L, out float bsdfPdf)
 }
 
 // SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
-vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V, vec3 N, out vec3 L, out float pdf)
+vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V, vec3 N, out vec3 L, out float pdf, out bool isRefract)
 {
     pdf = 0.0;
     vec3 f = vec3(0.0);
+    isRefract = false;
 
     float r1 = xi_1;
     float r2 = xi_2;
@@ -1128,7 +1129,9 @@ vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V,
         vec3 H = SampleGGXVNDF(V, material.ax, material.ay, r1, r2);
 
         if (H.z < 0.0)
-        H = -H;
+        {
+            H = -H;
+        }
 
         // TODO: Refactor into metallic BRDF and specular BSDF
         float fresnel = DisneyFresnel(material, eta, dot(L, H), dot(V, H));
@@ -1143,10 +1146,10 @@ vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V,
         }
         else
         {
+            isRefract = true;
             L = normalize(refract(-V, H, eta));
 
             f = EvalSpecRefraction(material, eta, V, L, H, pdf);
-            // pdf *= F;
             pdf *= (1.0 - F);
         }
 
@@ -1286,80 +1289,67 @@ float misMixWeight(float a, float b) {
 
 vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
 
-    vec3 Lo = vec3(0);
-    vec3 history = vec3(1);
+    vec3 Lo         = vec3(0);
+    vec3 history    = vec3(1);
 
     for (int i = 0; i < maxBounce; i++) {
 
         vec3 V = -hit.viewDir;
         vec3 N = hit.normal;
 
-        // HDR 环境贴图重要性采样
+        // Random Sample HDR Environment Map
         Ray hdrTestRay;
-        hdrTestRay.origin = hit.hitPoint;
-        hdrTestRay.direction = SampleHdr(rand(), rand());
+        hdrTestRay.origin       = hit.hitPoint;
+        hdrTestRay.direction    = SampleHdr(rand(), rand());
 
         vec3 tangent, bitangent;
         getTangent(N, tangent, bitangent);
 
-        // 进行一次求交测试 判断是否有遮挡
-        if(dot(N, hdrTestRay.direction) > 0.0) { // 如果采样方向背向点 p 则放弃测试, 因为 N dot L < 0
+        if(dot(N, hdrTestRay.direction) > 0.0) {
             HitRecord hdrHit = hitBVH(hdrTestRay);
 
-            // 天空光仅在没有遮挡的情况下积累亮度
             if(!hdrHit.isHit) {
-                // 获取采样方向 L 上的: 1.光照贡献, 2.环境贴图在该位置的 pdf, 3.BRDF 函数值, 4.BRDF 在该方向的 pdf
                 vec3 L = hdrTestRay.direction;
-                vec3 skyColor = hdrColor(L);
-                float pdf_light = hdrPdf(L, hdrResolution);
-                float pdf_brdf;
-                vec3 f_r = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material, pdf_brdf);
 
-//                Lo += history * skyColor / pdf_light;
+                float   light_pdf   = hdrPdf(L, hdrResolution);
+                vec3    light_fr    = hdrColor(L);
 
-                // 多重重要性采样
-                float mis_weight = misMixWeight(pdf_light, pdf_brdf);
-                Lo += mis_weight * history * skyColor * f_r * abs(dot(N, L)) / pdf_light;
+                float   disney_brdf_pdf;
+                vec3    disney_brdf_fr = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material, disney_brdf_pdf);
+
+                float mis_weight = misMixWeight(light_pdf, disney_brdf_pdf);
+                Lo += mis_weight * history * light_fr * disney_brdf_fr * abs(dot(N, L)) / light_pdf;
             }
         }
 
-        // 获取 3 个随机数
         vec2 uv = sobolVec2(camera.loopNum + 1, i);
         uv = CranleyPattersonRotation(uv);
         float xi_1 = uv.x;
         float xi_2 = uv.y;
-        float xi_3 = rand();    // xi_3 是决定采样的随机数, 朴素 rand 就好
+        float xi_3 = rand();
 
-        // 采样 BRDF 得到一个方向 L
         vec3 L = SampleBRDF(xi_1, xi_2, xi_3, V, N, hit.material);
         float NdotL = dot(N, L);
 
-        // 获取 L 方向上的 BRDF 值和概率密度
         float pdf_brdf;
         vec3 f_r = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material, pdf_brdf);
         if(pdf_brdf <= 0.0) break;
 
-        history *= f_r * abs(NdotL) / pdf_brdf;  // 累积颜色
+        history *= f_r * abs(NdotL) / pdf_brdf;
 
-        // 漫反射: 随机发射光线
         Ray randomRay;
         randomRay.origin = hit.hitPoint;
         randomRay.direction = L;
         HitRecord newHit = hitBVH(randomRay);
 
-        // 反弹未命中
         if(!newHit.isHit) {
             vec3 skyColor = vec3(0);
             if(enableEnvMap){
                 skyColor = hdrColor(L);
                 float pdf_light = hdrPdf(L, hdrResolution);
 
-                // 多重重要性采样
                 float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
                 Lo += mis_weight * history * skyColor * f_r * abs(NdotL) / pdf_brdf;
-
-//                // BRDF 重要性采样
-//                Lo += history * skyColor * f_r * abs(NdotL) / pdf_brdf;
             }
             else {
                 skyColor = getDefaultSkyColor(randomRay.direction.y);
@@ -1368,21 +1358,18 @@ vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
             break;
         }
 
-        // 命中
         vec3 Le = newHit.material.emissive;
         Lo += history * Le * f_r * abs(NdotL) / pdf_brdf;
 
-        // 递归(步进)
         hit = newHit;
-        // history *= f_r * abs(NdotL) / pdf_brdf;  // 累积颜色
     }
     return Lo;
 }
 
 vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
 
-    vec3 Lo = vec3(0);
-    vec3 history = vec3(1);
+    vec3 Lo         = vec3(0);
+    vec3 history    = vec3(1);
 
     for (int i = 0; i < maxBounce; i++) {
 
@@ -1395,7 +1382,7 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
         hdrTestRay.direction    = SampleHdr(rand(), rand());
 
         // Surface
-        if(dot(N, hdrTestRay.direction) > 0.0) {
+        if(dot(N, hdrTestRay.direction) >= 0.0) {
             HitRecord hdrHit = hitBVH(hdrTestRay);
 
             // Hit HDR Map
@@ -1418,6 +1405,28 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
             }
         }
         // TODO: InMeduie
+//        else {
+//            HitRecord hdrHit = hitBVH(hdrTestRay);
+//
+//            // if is Refract
+//            if (hdrHit.isHit && hdrHit.isInside) {
+//                vec3 L = hdrTestRay.direction;
+//
+//                float   light_pdf   = hdrPdf(L, hdrResolution);
+//                vec3    light_fr    = hdrColor(L);
+//
+//                float   disney_eval_pdf;
+//                vec3    disney_eval_fr = DisneyEval(hdrHit.material, V, N, L, disney_eval_pdf);
+//
+//                float   mis_weight = misMixWeight(light_pdf, disney_eval_pdf);
+//
+//                if (!enableMultiImportantSample) {
+//                    mis_weight = 1.0;
+//                }
+//
+//                Lo += mis_weight * history * light_fr * disney_eval_fr / light_pdf;
+//            }
+//        }
 
         // sobol random
         vec2    uv = sobolVec2(camera.loopNum + 1, i);
@@ -1430,14 +1439,13 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
         float disney_sample_pdf    = 0.0;
         vec3  disney_sample_fr     = vec3(0);
         vec3  L                    = vec3(0);
-        disney_sample_fr = DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, disney_sample_pdf);
+
+        bool isRefract;
+        disney_sample_fr = DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, disney_sample_pdf, isRefract);
 
         // Cumulative the Color
-        if (disney_sample_pdf > 0.0) {
-             history *= disney_sample_fr / disney_sample_pdf;
-        }
-        else {
-            break;
+        if (disney_sample_pdf > 0.0 && !isRefract) {
+            history *= disney_sample_fr / disney_sample_pdf;
         }
 
         // Next Hit

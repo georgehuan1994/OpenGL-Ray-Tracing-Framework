@@ -55,11 +55,11 @@ void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Mate
             minx = glm::min(minx, data[i].vertices[j].Position.x);
             miny = glm::min(minx, data[i].vertices[j].Position.y);
             minz = glm::min(minx, data[i].vertices[j].Position.z);
-//            std::cout << j << " Normal: " << data[i].vertices[j].Position.x << ", " << data[i].vertices[j].Position.y << ", "<< data[i].vertices[j].Position.z << std::endl;
+           // std::cout << j << " Normal: " << data[i].vertices[j].Position.x << ", " << data[i].vertices[j].Position.y << ", "<< data[i].vertices[j].Position.z << std::endl;
         }
         for (int k = 0; k < data[i].indices.size(); ++k) {
             indices.push_back(data[i].indices[k]);
-//            std::cout << k << " Position: " << data[i].indices[k] << std::endl;
+           // std::cout << k << " Position: " << data[i].indices[k] << std::endl;
         }
     }
 
@@ -81,6 +81,12 @@ void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Mate
         v = vec3(vv.x, vv.y, vv.z);
     }
 
+    for (auto &n : normals) {
+        vec4 nn = vec4(n.x, n.y, n.z, 0);
+        nn = trans * nn;
+        n = vec3(nn.x, nn.y, nn.z);
+    }
+
     // 构建 Triangle 对象数组
     int offset = triangles.size();  // 增量更新
     triangles.resize(offset + indices.size() / 3);
@@ -94,11 +100,13 @@ void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Mate
 
         // 传顶点法线
         if (!smoothNormal) {
+            // 平直着色
             vec3 n = normalize(cross(t.p2 - t.p1, t.p3 - t.p1));
             t.n1 = n;
             t.n2 = n;
             t.n3 = n;
         } else {
+            // 平滑着色
             t.n1 = normalize(normals[indices[i]]);
             t.n2 = normalize(normals[indices[i + 1]]);
             t.n3 = normalize(normals[indices[i + 2]]);

@@ -166,42 +166,57 @@ int main() {
     glass.IOR = 1.5;
     glass.roughness = 0.02;
 
-    Material purple_glass;
-    purple_glass.baseColor = vec3(0.085, 0.917, 0.848);
-    purple_glass.specular = 1.0;
-    purple_glass.transmission = 1.0;
-    purple_glass.IOR = 1.5;
-    purple_glass.roughness = 0.02;
+    Material green_glass;
+    green_glass.baseColor = vec3(0.54, 1, 0);
+    green_glass.specular = 1.0;
+    green_glass.transmission = 0.917;
+    green_glass.IOR = 1.45;
+    green_glass.roughness = 0.18;
+
+    Material boy_glass;
+    boy_glass.baseColor = vec3(1);
+    boy_glass.subsurface = 1.0;
+    boy_glass.specular = 1.0;
+    boy_glass.transmission = 0.917;
+    boy_glass.IOR = 1.45;
 
     // TODO GameObject
 
-    Material current_material = jade;
+    Material current_material = boy_glass;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
     getTriangle(floor.meshes, triangles, plane,
                 getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7, 7)), false);
 
-    Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
-    getTriangle(bunny.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
+    // Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
+    // getTriangle(bunny.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
 
-//    Model teapot("../../resources/objects/renderman/teapot.obj");
-//    getTriangle(teapot.meshes, triangles, current_material,
-//                getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
+   // Model teapot("../../resources/objects/renderman/teapot.obj");
+   // getTriangle(teapot.meshes, triangles, current_material,
+   //             getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
 
-//    Model sphere("../../resources/objects/glassball.obj");
-//    getTriangle(sphere.meshes, triangles, current_material,
-//                getTransformMatrix(vec3(0,0,0), vec3(2.2, -1, 3), vec3(2)), true);
+    // Model sphere("../../resources/objects/glassball.obj");
+    // getTriangle(sphere.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, 90, 0), vec3(2, -1, 3), vec3(2)), true);
 
-//     Model loong("../../resources/objects/loong.obj");        // 100000 face
-//     getTriangle(loong.meshes, triangles, current_material,
-//                 getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), false);
+    // Model loong("../../resources/objects/loong.obj");        // 100000 face
+    // getTriangle(loong.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), false);
+    //
+    // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
+    // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
+    // getTriangle(dragon.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
 
-//     camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
-//     Model dragon("../../resources/objects/dragon.obj");     // 831812 face
-//     getTriangle(dragon.meshes, triangles, current_material,
-//                 getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
+    Model boy_body("../../resources/objects/substance_boy/body.obj");
+    getTriangle(boy_body.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, -95, 0), vec3(1.8, -1.05, 3.5), vec3(1)), true);
+
+    Model boy_head("../../resources/objects/substance_boy/head.obj");
+    getTriangle(boy_head.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, -95, 0), vec3(1.8, 0.1, 3.6), vec3(1)), true);
 
 #pragma endregion
 
