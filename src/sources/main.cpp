@@ -203,8 +203,8 @@ int main() {
 
     // Model loong("../../resources/objects/loong.obj");        // 100000 face
     // getTriangle(loong.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), false);
-    //
+    //             getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
+
     // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
     // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
     // getTriangle(dragon.meshes, triangles, current_material,
@@ -216,7 +216,7 @@ int main() {
 
     Model boy_head("../../resources/objects/substance_boy/head.obj");
     getTriangle(boy_head.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -95, 0), vec3(1.8, 0.1, 3.6), vec3(1)), true);
+                getTransformMatrix(vec3(0, -95, 0), vec3(1.8, 0.12, 3.6), vec3(1)), true);
 
 #pragma endregion
 

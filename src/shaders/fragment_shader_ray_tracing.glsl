@@ -454,7 +454,7 @@ float GTR2_Aniso(float NdotH, float HdotX, float HdotY, float ax, float ay) {
 float SmithG_GGX(float NdotV, float alphaG) {
     float a = alphaG * alphaG;
     float b = NdotV * NdotV;
-    return (2.0 * NdotV) / (NdotV + sqrt(a + b - a * b));
+    // return (2.0 * NdotV) / (NdotV + sqrt(a + b - a * b));
     return 1.0           / (NdotV + sqrt(a + b - a * b));
 }
 
@@ -1129,9 +1129,7 @@ vec3 DisneySample(float xi_1, float xi_2, float xi_3, Material material, vec3 V,
         vec3 H = SampleGGXVNDF(V, material.ax, material.ay, r1, r2);
 
         if (H.z < 0.0)
-        {
-            H = -H;
-        }
+        H = -H;
 
         // TODO: Refactor into metallic BRDF and specular BSDF
         float fresnel = DisneyFresnel(material, eta, dot(L, H), dot(V, H));
@@ -1382,7 +1380,7 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
         hdrTestRay.direction    = SampleHdr(rand(), rand());
 
         // Surface
-        if(dot(N, hdrTestRay.direction) >= 0.0) {
+        if(dot(N, hdrTestRay.direction) > 0.0) {
             HitRecord hdrHit = hitBVH(hdrTestRay);
 
             // Hit HDR Map
@@ -1404,29 +1402,6 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
                 Lo += mis_weight * history * light_fr * disney_eval_fr / light_pdf;
             }
         }
-        // TODO: InMeduie
-//        else {
-//            HitRecord hdrHit = hitBVH(hdrTestRay);
-//
-//            // if is Refract
-//            if (hdrHit.isHit && hdrHit.isInside) {
-//                vec3 L = hdrTestRay.direction;
-//
-//                float   light_pdf   = hdrPdf(L, hdrResolution);
-//                vec3    light_fr    = hdrColor(L);
-//
-//                float   disney_eval_pdf;
-//                vec3    disney_eval_fr = DisneyEval(hdrHit.material, V, N, L, disney_eval_pdf);
-//
-//                float   mis_weight = misMixWeight(light_pdf, disney_eval_pdf);
-//
-//                if (!enableMultiImportantSample) {
-//                    mis_weight = 1.0;
-//                }
-//
-//                Lo += mis_weight * history * light_fr * disney_eval_fr / light_pdf;
-//            }
-//        }
 
         // sobol random
         vec2    uv = sobolVec2(camera.loopNum + 1, i);
@@ -1444,9 +1419,14 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
         disney_sample_fr = DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, disney_sample_pdf, isRefract);
 
         // Cumulative the Color
-        if (disney_sample_pdf > 0.0 && !isRefract) {
+        if (disney_sample_pdf > 0.0) {
+            if (!isRefract)
             history *= disney_sample_fr / disney_sample_pdf;
         }
+        else {
+            break;
+        }
+        // TODO: InMeduie
 
         // Next Hit
         float disney_eval_pdf     = 0.0;
