@@ -77,9 +77,9 @@ int hdrResolution;
 int main() {
 
     glfwInit();
-    const char *glsl_version = "#version 330 core";
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 3);
+    const char *glsl_version = "#version 450";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
@@ -117,6 +117,7 @@ int main() {
     Shader RayTracerShader(vertexShaderPath,"../../src/shaders/fragment_shader_ray_tracing.glsl");
     Shader ScreenShader(vertexShaderPath, "../../src/shaders/fragment_shader_screen.glsl");
     Shader ToneMappingShader(vertexShaderPath,"../../src/shaders/fragment_shader_tone_mapping.glsl");
+    Shader CompShader("../../src/shaders/compute_shader_test.glsl");
 
     Screen screen;
     screen.InitScreenBind();
@@ -154,7 +155,7 @@ int main() {
 
     Material copper_bsdf;
     copper_bsdf.baseColor = vec3(238.0f/255.0f, 158.0f/255.0f, 137.0f/255.0f);
-    copper_bsdf.roughness = 0.05;
+    copper_bsdf.roughness = 0.15;
     copper_bsdf.specular = 1.0;
     copper_bsdf.IOR = 1.21901;
     copper_bsdf.metallic = 1.0;
@@ -182,7 +183,7 @@ int main() {
 
     // TODO GameObject
 
-    Material current_material = copper_bsdf;
+    Material current_material = boy_glass;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
@@ -197,9 +198,9 @@ int main() {
    // getTriangle(teapot.meshes, triangles, current_material,
    //             getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
 
-    Model sphere("../../resources/objects/glassball.obj");
-    getTriangle(sphere.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, 90, 0), vec3(1.5, -1, 3), vec3(2)), true);
+    // Model sphere("../../resources/objects/glassball.obj");
+    // getTriangle(sphere.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, 90, 0), vec3(1.5, -1, 3), vec3(2)), true);
 
     // Model loong("../../resources/objects/loong.obj");        // 100000 face
     // getTriangle(loong.meshes, triangles, current_material,
@@ -210,13 +211,13 @@ int main() {
     // getTriangle(dragon.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
 
-    // Model boy_body("../../resources/objects/substance_boy/body.obj");
-    // getTriangle(boy_body.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, -95, 0), vec3(1.8, -1.05, 3.5), vec3(1)), true);
-    //
-    // Model boy_head("../../resources/objects/substance_boy/head.obj");
-    // getTriangle(boy_head.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, -95, 0), vec3(1.8, 0.12, 3.6), vec3(1)), true);
+    Model boy_body("../../resources/objects/substance_boy/body.obj");
+    getTriangle(boy_body.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, -100, 0), vec3(1.7, -1.25, 3.5), vec3(0.8)), true);
+
+    Model boy_head("../../resources/objects/substance_boy/head.obj");
+    getTriangle(boy_head.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, -100, 0), vec3(1.7, -0.33, 3.6), vec3(0.8)), true);
 
 #pragma endregion
 
@@ -338,6 +339,40 @@ int main() {
         cameraPosition[i] = camera.Position[i];
         cameraRotation[i] = camera.Rotation[i];
     }
+
+    // dimensions of the image
+    GLuint tex_output;
+    glGenTextures(1, &tex_output);
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex_output);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glBindImageTexture(0, tex_output, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+
+    int work_grp_cnt[3];
+
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_cnt[0]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &work_grp_cnt[1]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &work_grp_cnt[2]);
+
+    printf("max global (total) work group counts x:%i y:%i z:%i\n",
+           work_grp_cnt[0], work_grp_cnt[1], work_grp_cnt[2]);
+
+    int work_grp_size[3];
+
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size[0]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &work_grp_size[1]);
+    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &work_grp_size[2]);
+
+    printf("max local (in one shader) work group sizes x:%i y:%i z:%i\n",
+           work_grp_size[0], work_grp_size[1], work_grp_size[2]);
+
+    // glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
+    // printf("max local work group invocations %i\n", work_grp_inv);
+
 
     // Render Loop
     // -----------
@@ -554,6 +589,21 @@ int main() {
             ToneMappingShader.setInt("texPass0", 0);
             screen.DrawScreen();
         }
+
+        // {
+        //     CompShader.use();
+        //     // glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        //     glDispatchCompute((GLuint)width, (GLuint)height, 1);
+        //     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        //
+        //     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        //     glClear(GL_COLOR_BUFFER_BIT);
+        //
+        //     ScreenShader.use();
+        //     glActiveTexture(GL_TEXTURE0);
+        //     glBindTexture(GL_TEXTURE_2D, tex_output);
+        //     screen.DrawScreen();
+        // }
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

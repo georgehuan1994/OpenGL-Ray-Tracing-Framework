@@ -17,7 +17,7 @@ public:
     // 程序ID
     unsigned int ID;
 
-    // 构造函数
+    // 顶点-片段着色器构造函数
     Shader(const char *vertexPath, const char *fragmentPath) {
         // 获取顶点和片段着色器
         // ----------------
@@ -97,6 +97,62 @@ public:
         // 删除着色器，它们已经链接到我们的程序中了，已经不再需要了
         glDeleteShader(vertex);
         glDeleteShader(fragment);
+    }
+
+    Shader(const char *computePath) {
+        std::string computeCode;
+        std::ifstream cShaderFile;
+
+        // 保证 ifstream 对象可以抛出异常
+        cShaderFile.exceptions(std::ifstream::failbit | std::ifstream::badbit);
+
+        try {
+            // 打开文件
+            cShaderFile.open(computePath);
+            std::stringstream cShaderStream;
+            // 读取文件的缓冲内容到数据流中
+            cShaderStream << cShaderFile.rdbuf();
+            // 关闭文件处理器
+            cShaderFile.close();
+            // 转化到 string
+            computeCode = cShaderStream.str();
+        }
+        catch (std::ifstream::failure failure) {
+            std::cout << "ERROR::SHADER:FILE_NOT_SUCCESSFULLY_READ" << std::endl;
+        }
+
+        const char *cShaderCode = computeCode.c_str();
+
+        // 编译着色器
+        // --------
+        unsigned int compute;
+        int success;
+        char infoLog[512];
+
+        compute = glCreateShader(GL_COMPUTE_SHADER);
+        glShaderSource(compute, 1, &cShaderCode, nullptr);
+        glCompileShader(compute);
+        std::cout << "Compiling compute shader: " << computePath << std::endl;
+
+        glGetShaderiv(compute, GL_COMPILE_STATUS, &success);
+        if (!success) {
+            glGetShaderInfoLog(compute, 512, nullptr, infoLog);
+            std::cout << "ERROR::SHADER::COMPUTE::COMPILATION_FAILED\n" << infoLog << std::endl;
+        }
+
+        // 着色器程序
+        ID = glCreateProgram();
+        glAttachShader(ID, compute);
+        glLinkProgram(ID);
+
+        glGetProgramiv(ID, GL_LINK_STATUS, &success);
+        if (!success) {
+            glGetProgramInfoLog(ID, 512, nullptr, infoLog);
+            std::cout << "ERROR::SHADER::PROGRAM::LINKING_FAILED\n" << infoLog << std::endl;
+        }
+
+        // 删除着色器，它们已经链接到我们的程序中了，已经不再需要了
+        glDeleteShader(compute);
     }
 
     // 激活程序
