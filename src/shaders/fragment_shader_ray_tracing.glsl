@@ -418,13 +418,6 @@ void GetSpecColor(Material mat, float eta, out vec3 specCol, out vec3 sheenCol)
     sheenCol = mix(vec3(1.0), ctint, mat.sheenTint);
 }
 
-void CalculateAnisotropicParams(float roughness, float anisotropic, out float ax, out float ay)
-{
-    float aspect = sqrt(1.0f - 0.9f * anisotropic);
-    ax = max(0.001, sqr(roughness) / aspect);
-    ay = max(0.001, sqr(roughness) * aspect);
-}
-
 // Normal Distribution: Generalized-Trowbridge-Reitz, γ=1, Berry
 // -------------------------------------------------------------
 float GTR1(float NdotH, float alpha) {
@@ -449,12 +442,12 @@ float GTR2_Aniso(float NdotH, float HdotX, float HdotY, float ax, float ay) {
     return 1.0 / (PI * ax * ay * c * c);
 }
 
-// Geometry - Clearcoat
+// Geometry
 // --------
 float SmithG_GGX(float NdotV, float alphaG) {
     float a = alphaG * alphaG;
     float b = NdotV * NdotV;
-    // return (2.0 * NdotV) / (NdotV + sqrt(a + b - a * b));
+    return (2.0 * NdotV) / (NdotV + sqrt(a + b - a * b));
     return 1.0           / (NdotV + sqrt(a + b - a * b));
 }
 
@@ -491,7 +484,7 @@ float DielectricFresnel(float cosThetaI, float eta)
     float rs = (eta * cosThetaT - cosThetaI) / (eta * cosThetaT + cosThetaI);
     float rp = (eta * cosThetaI - cosThetaT) / (eta * cosThetaI + cosThetaT);
 
-    return 0.5f * (rs * rs + rp * rp);
+    return 0.5 * (rs * rs + rp * rp);
 }
 
 // mix schlick fresnel and dielectric fresnel
@@ -894,8 +887,8 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material,
 
     // Evaluate xxx Item BRDF fr
     vec3 diffuse = INV_PI * mix(Fd, ss, material.subsurface) * Cdlin + Fsheen;
-    vec3 specular = Gs * Fs * Ds;
-    vec3 clearcoat = vec3(0.25) * Gr * Fr * Dr * material.clearcoat;
+    vec3 specular = Gs * Fs * Ds / (4.0 * NdotV * NdotL);
+    vec3 clearcoat = vec3(0.25) * Gr * Fr * Dr * material.clearcoat / (4.0 * NdotV * NdotL);
 
     // 根据辐射度计算概率
     float p_diffuse;

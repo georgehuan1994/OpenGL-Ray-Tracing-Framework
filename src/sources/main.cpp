@@ -182,7 +182,7 @@ int main() {
 
     // TODO GameObject
 
-    Material current_material = boy_glass;
+    Material current_material = copper_bsdf;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
@@ -197,9 +197,9 @@ int main() {
    // getTriangle(teapot.meshes, triangles, current_material,
    //             getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
 
-    // Model sphere("../../resources/objects/glassball.obj");
-    // getTriangle(sphere.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, 90, 0), vec3(2, -1, 3), vec3(2)), true);
+    Model sphere("../../resources/objects/glassball.obj");
+    getTriangle(sphere.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, 90, 0), vec3(1.5, -1, 3), vec3(2)), true);
 
     // Model loong("../../resources/objects/loong.obj");        // 100000 face
     // getTriangle(loong.meshes, triangles, current_material,
@@ -210,13 +210,13 @@ int main() {
     // getTriangle(dragon.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
 
-    Model boy_body("../../resources/objects/substance_boy/body.obj");
-    getTriangle(boy_body.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -95, 0), vec3(1.8, -1.05, 3.5), vec3(1)), true);
-
-    Model boy_head("../../resources/objects/substance_boy/head.obj");
-    getTriangle(boy_head.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -95, 0), vec3(1.8, 0.12, 3.6), vec3(1)), true);
+    // Model boy_body("../../resources/objects/substance_boy/body.obj");
+    // getTriangle(boy_body.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, -95, 0), vec3(1.8, -1.05, 3.5), vec3(1)), true);
+    //
+    // Model boy_head("../../resources/objects/substance_boy/head.obj");
+    // getTriangle(boy_head.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, -95, 0), vec3(1.8, 0.12, 3.6), vec3(1)), true);
 
 #pragma endregion
 

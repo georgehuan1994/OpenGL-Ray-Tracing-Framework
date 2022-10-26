@@ -21,6 +21,8 @@ After [《Ray Tracing in One Weekend Book Series》](https://github.com/RayTraci
 
 [Physically Based Shading at Disney](https://media.disneyanimation.com/uploads/production/publication_asset/48/asset/s2012_pbs_disney_brdf_notes_v3.pdf)
 
+[Extending the Disney BRDF to a BSDF with Integrated Subsurface Scattering (Brent Burley)](https://blog.selfshadow.com/publications/s2015-shading-course/burley/s2015_pbs_disney_bsdf_notes.pdf)
+
 [Physically Based Rendering: From Theory to Implementation](https://www.pbr-book.org/3ed-2018/contents)
 
 ### repo
@@ -29,9 +31,13 @@ After [《Ray Tracing in One Weekend Book Series》](https://github.com/RayTraci
 
 [GitHub - knightcrawler25/GLSL-PathTracer: A GLSL Path Tracer](https://github.com/knightcrawler25/GLSL-PathTracer)
 
+[blender/gpu_shader_material_principled.glsl at master · blender/blender](https://github.com/blender/blender/blob/master/source/blender/gpu/shaders/material/gpu_shader_material_principled.glsl)
+
 ## TODO
 
-- Texture mapping
-- Object / Material / Scene manager
-- Gizmo
-- Compute Shader version
+- [ ] Subsurface Scattering and Thin Surface
+- [ ] Use Compute Shader
+- [ ] Texture Mapping
+- [ ] Material Instances
+- [ ] Scene Manager
+- [ ] Gizmo
