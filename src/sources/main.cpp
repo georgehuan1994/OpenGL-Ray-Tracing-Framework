@@ -77,9 +77,15 @@ int hdrResolution;
 int main() {
 
     glfwInit();
+#ifdef __APPLE__
+    const char *glsl_version = "#version 410";
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+#else
     const char *glsl_version = "#version 450";
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 5);
+#endif
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
 #ifdef __APPLE__
@@ -117,7 +123,9 @@ int main() {
     Shader RayTracerShader(vertexShaderPath,"../../src/shaders/fragment_shader_ray_tracing.glsl");
     Shader ScreenShader(vertexShaderPath, "../../src/shaders/fragment_shader_screen.glsl");
     Shader ToneMappingShader(vertexShaderPath,"../../src/shaders/fragment_shader_tone_mapping.glsl");
+#ifndef __APPLE__
     Shader CompShader("../../src/shaders/compute_shader_test.glsl");
+#endif
 
     Screen screen;
     screen.InitScreenBind();
@@ -213,11 +221,11 @@ int main() {
 
     Model boy_body("../../resources/objects/substance_boy/body.obj");
     getTriangle(boy_body.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -100, 0), vec3(1.7, -1.25, 3.5), vec3(0.8)), true);
+                getTransformMatrix(vec3(0, -110, 0), vec3(1.7, -1.25, 3.5), vec3(0.8)), true);
 
     Model boy_head("../../resources/objects/substance_boy/head.obj");
     getTriangle(boy_head.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -100, 0), vec3(1.7, -0.33, 3.6), vec3(0.8)), true);
+                getTransformMatrix(vec3(0, -95, 0), vec3(1.7, -0.33, 3.6), vec3(0.8)), true);
 
 #pragma endregion
 
@@ -340,6 +348,7 @@ int main() {
         cameraRotation[i] = camera.Rotation[i];
     }
 
+#ifndef __APPLE__
     // dimensions of the image
     GLuint tex_output;
     glGenTextures(1, &tex_output);
@@ -372,7 +381,7 @@ int main() {
 
     // glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
     // printf("max local work group invocations %i\n", work_grp_inv);
-
+#endif
 
     // Render Loop
     // -----------
@@ -590,20 +599,22 @@ int main() {
             screen.DrawScreen();
         }
 
-        // {
-        //     CompShader.use();
-        //     // glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-        //     glDispatchCompute((GLuint)width, (GLuint)height, 1);
-        //     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-        //
-        //     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-        //     glClear(GL_COLOR_BUFFER_BIT);
-        //
-        //     ScreenShader.use();
-        //     glActiveTexture(GL_TEXTURE0);
-        //     glBindTexture(GL_TEXTURE_2D, tex_output);
-        //     screen.DrawScreen();
-        // }
+#ifndef __APPLE__
+        {
+            CompShader.use();
+            // glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+            glDispatchCompute((GLuint)width, (GLuint)height, 1);
+            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+
+            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+            glClear(GL_COLOR_BUFFER_BIT);
+
+            ScreenShader.use();
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, tex_output);
+            screen.DrawScreen();
+        }
+#endif
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());

@@ -44,6 +44,14 @@ public:
             // 转化到 string
             vertexCode = vShaderStream.str();
             fragmentCode = fShaderStream.str();
+
+#ifdef __APPLE__
+            vertexCode = "\n#version 410\n" + vertexCode;
+            fragmentCode = "\n#version 410\n" + fragmentCode;
+#else
+            vertexCode = "\n#version 450\n" + vertexCode;
+            fragmentCode = "\n#version 450\n" + fragmentCode;
+#endif
         }
         catch (std::ifstream::failure failure) {
             std::cout << "ERROR::SHADER:FILE_NOT_SUCCESSFULLY_READ" << std::endl;
