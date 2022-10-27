@@ -14,9 +14,17 @@
 
 using namespace glm;
 
+enum MediumType
+{
+    None,
+    Absorb,
+    Scatter,
+    Emissive
+};
+
 struct Material {
-    glm::vec3   emissive        = glm::vec3(0, 0, 0);  // 作为光源时的发光颜色
-    glm::vec3   baseColor       = glm::vec3(1, 1, 1);
+    glm::vec3   emissive        = glm::vec3(0);  // 作为光源时的发光颜色
+    glm::vec3   baseColor       = glm::vec3(1);
     float       subsurface      = 0.0;
     float       metallic        = 0.0;
     float       specular        = 0.0;
@@ -30,13 +38,18 @@ struct Material {
     float       IOR             = 1.0;
     float       transmission    = 0.0;
 
+    glm::vec3   mediumColor         = glm::vec3(1);
+    float       mediumType          = 0.0;
+    float       mediumDensity       = 0.0;
+    float       mediumAnisotropy    = 0.0;
+
     float       baseColorTexID          = -1.0;
     float       metallicRoughnessTexID  = -1.0;
     float       normalmapTexID          = -1.0;
     float       emissionmapTexID        = -1.0;
 };
 
-static float baseColor[4]   = {1.0f, 1.0, 1.0f, 1.0f};
+static float baseColor[4]   = {1.0f, 1.0f, 1.0f, 1.0f};
 static float emissive[3]    = {0.0f, 0.0f, 0.0f};
 static float subsurface     = 0.0f;
 static float metallic       = 0.0f;
@@ -50,6 +63,11 @@ static float clearcoat      = 0.0f;
 static float clearcoatGloss = 0.0f;
 static float IOR            = 1.5f;
 static float transmission   = 0.0f;
+
+static float mediumColor[3]     = {1.0f, 1.0f, 1.0f};
+static int   mediumType         = 0;
+static float mediumDensity      = 0.0f;
+static float mediumAnisotropy   = 0.0f;
 
 void SetGlobalMaterialProperty(Material material) {
     baseColor[0]    = material.baseColor.x;
@@ -72,6 +90,14 @@ void SetGlobalMaterialProperty(Material material) {
     clearcoatGloss  = material.clearcoatGloss;
     IOR             = material.IOR;
     transmission    = material.transmission;
+
+    mediumColor[0]     = material.mediumColor.x;
+    mediumColor[1]     = material.mediumColor.y;
+    mediumColor[2]     = material.mediumColor.z;
+
+    mediumType         = material.mediumType;
+    mediumDensity      = material.mediumDensity;
+    mediumAnisotropy   = material.mediumAnisotropy;
 }
 
 #endif //MATERIAL_H

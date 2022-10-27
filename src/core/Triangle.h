@@ -21,14 +21,16 @@ struct Triangle {
 };
 
 struct Triangle_encoded {
-    glm::vec3 p1, p2, p3;    // 顶点坐标
-    glm::vec3 n1, n2, n3;    // 顶点法线
-    glm::vec3 emissive;      // 自发光参数
-    glm::vec3 baseColor;     // 颜色
-    glm::vec3 param1;        // (subsurface, metallic, specular)
-    glm::vec3 param2;        // (specularTint, roughness, anisotropic)
-    glm::vec3 param3;        // (sheen, sheenTint, clearcoat)
-    glm::vec3 param4;        // (clearcoatGloss, IOR, transmission)
+    glm::vec3 p1, p2, p3;    // offset:0，1，2 顶点坐标
+    glm::vec3 n1, n2, n3;    // offset:3，4，5 顶点法线
+    glm::vec3 emissive;      // offset:6 自发光
+    glm::vec3 baseColor;     // offset:7 基础颜色
+    glm::vec3 param1;        // offset:8 (subsurface, metallic, specular)
+    glm::vec3 param2;        // offset:9 (specularTint, roughness, anisotropic)
+    glm::vec3 param3;        // offset:10 (sheen, sheenTint, clearcoat)
+    glm::vec3 param4;        // offset:11 (clearcoatGloss, IOR, transmission)
+    glm::vec3 mediumColor;   // offset:12 内部颜色
+    glm::vec3 param5;        // offset:13 (mediumType, mediumDensity, mediumAnisotropy)
 };
 
 void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Material material, mat4 trans, bool smoothNormal = false) {
@@ -128,6 +130,8 @@ void RefreshTriangleMaterial(vector<Triangle> &triangles, vector<Triangle_encode
         triangles_encoded[i].param2 = vec3(m.specularTint, m.roughness, m.anisotropic);
         triangles_encoded[i].param3 = vec3(m.sheen, m.sheenTint, m.clearcoat);
         triangles_encoded[i].param4 = vec3(m.clearcoatGloss, m.IOR, m.transmission);
+        triangles_encoded[i].mediumColor = m.mediumColor;
+        triangles_encoded[i].param5 = vec3(m.mediumType, m.mediumDensity, m.mediumAnisotropy);
     }
     glBindBuffer(GL_TEXTURE_BUFFER, tbo);
     glBufferData(GL_TEXTURE_BUFFER, triangles_encoded.size() * sizeof(Triangle_encoded), &triangles_encoded[0], GL_STATIC_DRAW);
@@ -154,6 +158,8 @@ void EncodeTriangle(vector<Triangle> &triangles, vector<Triangle_encoded> &trian
         triangles_encoded[i].param2 = vec3(m.specularTint, m.roughness, m.anisotropic);
         triangles_encoded[i].param3 = vec3(m.sheen, m.sheenTint, m.clearcoat);
         triangles_encoded[i].param4 = vec3(m.clearcoatGloss, m.IOR, m.transmission);
+        triangles_encoded[i].mediumColor = m.mediumColor;
+        triangles_encoded[i].param5 = vec3(m.mediumType, m.mediumDensity, m.mediumAnisotropy);
     }
 }
 

@@ -9,7 +9,7 @@
 #define EPS             0.0001
 #define INF             114514.0
 
-#define SIZE_TRIANGLE   12
+#define SIZE_TRIANGLE   14
 #define SIZE_BVHNODE    4
 
 #define MEDIUM_NONE 0
@@ -38,8 +38,8 @@ struct BVHNode {
 
 struct Medium           // TODO: Add Medium Params
 {
-    int     type;
-    float   density;
+    int     type;       // 0:NONE, 1:ABSORB, 2:SCATTER, 3:EMISSIVE
+    float   density;    // 0-1
     vec3    color;
     float   anisotropy;
 };
@@ -172,34 +172,40 @@ Material getMaterial(int i) {
 
     Material m;
 
-    int offset      = i * SIZE_TRIANGLE;
-    vec3 param1     = texelFetch(triangles, offset + 8).xyz;
-    vec3 param2     = texelFetch(triangles, offset + 9).xyz;
-    vec3 param3     = texelFetch(triangles, offset + 10).xyz;
-    vec3 param4     = texelFetch(triangles, offset + 11).xyz;
+    int offset          = i * SIZE_TRIANGLE;
+    vec3 param1         = texelFetch(triangles, offset + 8).xyz;
+    vec3 param2         = texelFetch(triangles, offset + 9).xyz;
+    vec3 param3         = texelFetch(triangles, offset + 10).xyz;
+    vec3 param4         = texelFetch(triangles, offset + 11).xyz;
+    vec3 param5         = texelFetch(triangles, offset + 13).xyz;
 
-    m.emissive      = texelFetch(triangles, offset + 6).xyz;
-    m.baseColor     = texelFetch(triangles, offset + 7).xyz;
+    m.emissive          = texelFetch(triangles, offset + 6).xyz;
+    m.baseColor         = texelFetch(triangles, offset + 7).xyz;
+    m.medium.color      = texelFetch(triangles, offset + 12).xyz;
 
-    m.subsurface    = param1.x;
-    m.metallic      = param1.y;
-    m.specular      = param1.z;
+    m.subsurface        = param1.x;
+    m.metallic          = param1.y;
+    m.specular          = param1.z;
 
-    m.specularTint  = param2.x;
-    m.roughness     = param2.y;
-    m.anisotropic   = param2.z;
+    m.specularTint      = param2.x;
+    m.roughness         = param2.y;
+    m.anisotropic       = param2.z;
 
-    m.sheen         = param3.x;
-    m.sheenTint     = param3.y;
-    m.clearcoat     = param3.z;
+    m.sheen             = param3.x;
+    m.sheenTint         = param3.y;
+    m.clearcoat         = param3.z;
 
     m.clearcoatGloss    = param4.x;
     m.IOR               = param4.y;
     m.transmission      = param4.z;
 
-    float aspect    = sqrt(1.0 - m.anisotropic * 0.9);
-    m.ax            = max(0.001, sqr(m.roughness) / aspect);
-    m.ay            = max(0.001, sqr(m.roughness) * aspect);
+    float aspect        = sqrt(1.0 - m.anisotropic * 0.9);
+    m.ax                = max(0.001, sqr(m.roughness) / aspect);
+    m.ay                = max(0.001, sqr(m.roughness) * aspect);
+
+    m.medium.type       = int(param5.x);
+    m.medium.density    = param5.y;
+    m.medium.anisotropy = param5.z;
 
     return m;
 }
@@ -426,7 +432,8 @@ float GTR1(float NdotH, float alpha) {
     return (a2 - 1) / (PI * log(a2) * t);
 }
 
-// Normal Distribution: Generalized-Trowbridge-Reitz, γ=2, Trowbridge-Reitz
+// Normal Distribution: Generalized-Trowbridge-Reitz, γ=2, GGX / Trowbridge-Reitz
+// [Walter et al. 2007, "Microfacet models for refraction through rough surfaces"]
 // -------------------------------------------------------------
 float GTR2(float NdotH, float alpha) {
     float a2 = alpha * alpha;
@@ -877,7 +884,7 @@ vec3 BRDF_Evaluate(vec3 V, vec3 N, vec3 L, vec3 X, vec3 Y, in Material material,
     }
 
     // 清漆 Clearcoat
-    float Dr = GTR1(NdotH, mix(0.1, 0.001, material.clearcoatGloss));
+    float Dr = GTR1(NdotH, mix(0.1, 0.001, 1.0 - material.clearcoatGloss));
     float Fr = mix(0.04, 1.0, FH);
     float Gr = SmithG_GGX(NdotL, 0.25) * SmithG_GGX(NdotV, 0.25);
 
@@ -1412,8 +1419,16 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
 
         // Cumulative the Color
         if (disney_sample_pdf > 0.0) {
-            if (!isRefract)
-            history *= disney_sample_fr / disney_sample_pdf;
+            if (!isRefract) {
+                history *= disney_sample_fr / disney_sample_pdf;
+            }
+            else {
+                if (hit.material.medium.type == MEDIUM_ABSORB)
+                history *= exp(-(1.0 - hit.material.medium.color) * hit.distance * hit.material.medium.density);
+
+                // medium.type == MEDIUM_EMISSIVE
+                // Lo += hit.material.medium.color * hit.distance * hit.material.medium.density * history;
+            }
         }
         else {
             break;

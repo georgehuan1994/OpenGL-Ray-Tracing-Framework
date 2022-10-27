@@ -123,8 +123,9 @@ int main() {
     Shader RayTracerShader(vertexShaderPath,"../../src/shaders/fragment_shader_ray_tracing.glsl");
     Shader ScreenShader(vertexShaderPath, "../../src/shaders/fragment_shader_screen.glsl");
     Shader ToneMappingShader(vertexShaderPath,"../../src/shaders/fragment_shader_tone_mapping.glsl");
+
 #ifndef __APPLE__
-    Shader CompShader("../../src/shaders/compute_shader_test.glsl");
+    // Shader CompShader("../../src/shaders/compute_shader_test.glsl");
 #endif
 
     Screen screen;
@@ -161,12 +162,12 @@ int main() {
     golden.specular = 1.0;
     golden.metallic = 1.0;
 
-    Material copper_bsdf;
-    copper_bsdf.baseColor = vec3(238.0f/255.0f, 158.0f/255.0f, 137.0f/255.0f);
-    copper_bsdf.roughness = 0.15;
-    copper_bsdf.specular = 1.0;
-    copper_bsdf.IOR = 1.21901;
-    copper_bsdf.metallic = 1.0;
+    Material copper;
+    copper.baseColor = vec3(238.0f / 255.0f, 158.0f / 255.0f, 137.0f / 255.0f);
+    copper.roughness = 0.2;
+    copper.specular = 1.0;
+    copper.IOR = 1.21901;
+    copper.metallic = 1.0;
 
     Material glass;
     glass.baseColor = vec3(1, 1, 1);
@@ -191,7 +192,7 @@ int main() {
 
     // TODO GameObject
 
-    Material current_material = boy_glass;
+    Material current_material = glass;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
@@ -206,9 +207,9 @@ int main() {
    // getTriangle(teapot.meshes, triangles, current_material,
    //             getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
 
-    // Model sphere("../../resources/objects/glassball.obj");
-    // getTriangle(sphere.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, 90, 0), vec3(1.5, -1, 3), vec3(2)), true);
+    Model sphere("../../resources/objects/glassball.obj");
+    getTriangle(sphere.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, 90, 0), vec3(1.8, -1, 3), vec3(2)), true);
 
     // Model loong("../../resources/objects/loong.obj");        // 100000 face
     // getTriangle(loong.meshes, triangles, current_material,
@@ -219,13 +220,13 @@ int main() {
     // getTriangle(dragon.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
 
-    Model boy_body("../../resources/objects/substance_boy/body.obj");
-    getTriangle(boy_body.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -110, 0), vec3(1.7, -1.25, 3.5), vec3(0.8)), true);
-
-    Model boy_head("../../resources/objects/substance_boy/head.obj");
-    getTriangle(boy_head.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -95, 0), vec3(1.7, -0.33, 3.6), vec3(0.8)), true);
+    // Model boy_body("../../resources/objects/substance_boy/body.obj");
+    // getTriangle(boy_body.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, -110, 0), vec3(1.7, -1.25, 3.5), vec3(0.8)), true);
+    //
+    // Model boy_head("../../resources/objects/substance_boy/head.obj");
+    // getTriangle(boy_head.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, -95, 0), vec3(1.7, -0.33, 3.6), vec3(0.8)), true);
 
 #pragma endregion
 
@@ -267,6 +268,8 @@ int main() {
         triangles_encoded[i].param2 = vec3(m.specularTint, m.roughness, m.anisotropic);
         triangles_encoded[i].param3 = vec3(m.sheen, m.sheenTint, m.clearcoat);
         triangles_encoded[i].param4 = vec3(m.clearcoatGloss, m.IOR, m.transmission);
+        triangles_encoded[i].mediumColor = m.mediumColor;
+        triangles_encoded[i].param5 = vec3(m.mediumType, m.mediumDensity, m.mediumAnisotropy);
     }
     RayTracerShader.setInt("nTriangles", nTriangles);
 
@@ -349,17 +352,17 @@ int main() {
     }
 
 #ifndef __APPLE__
-    // dimensions of the image
-    GLuint tex_output;
-    glGenTextures(1, &tex_output);
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, tex_output);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
-    glBindImageTexture(0, tex_output, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+    // // dimensions of the image
+    // GLuint tex_output;
+    // glGenTextures(1, &tex_output);
+    // glActiveTexture(GL_TEXTURE0);
+    // glBindTexture(GL_TEXTURE_2D, tex_output);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    // glBindImageTexture(0, tex_output, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
 
     int work_grp_cnt[3];
 
@@ -443,9 +446,9 @@ int main() {
         ImGui::Checkbox("Enable ToneMapping", &enableToneMapping);
         ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
         ImGui::Separator();
-        // ImGui::Checkbox("Demo Window", &show_demo_window);
-        // if (show_demo_window)
-        //     ImGui::ShowDemoWindow(&show_demo_window);
+        ImGui::Checkbox("Demo Window", &show_demo_window);
+        if (show_demo_window)
+            ImGui::ShowDemoWindow(&show_demo_window);
         if (ImGui::Button("Save Image")) {
             SaveFrame("../../screenshot/screenshot_bunny_" + to_string(camera.LoopNum) + "_spp.png", width, height);
         }
@@ -526,6 +529,26 @@ int main() {
                 RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
                 camera.LoopNum = 0;
             }
+            if (ImGui::Combo("Medium Type", &mediumType, "None\0Absorb\0Scatter\0Emissive\0\0")) {
+                current_material.mediumType = (float)mediumType;
+                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+                camera.LoopNum = 0;
+            }
+            if (ImGui::ColorEdit4("Medium Color", mediumColor)) {
+                current_material.mediumColor = vec3(mediumColor[0], mediumColor[1], mediumColor[2]);
+                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+                camera.LoopNum = 0;
+            }
+            if (ImGui::SliderFloat("Medium Density", &mediumDensity, 0, 1)) {
+                current_material.mediumDensity = mediumDensity;
+                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+                camera.LoopNum = 0;
+            }
+            if (ImGui::SliderFloat("Medium Anisotropy", &mediumAnisotropy, 0, 1)) {
+                current_material.mediumAnisotropy = mediumAnisotropy;
+                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+                camera.LoopNum = 0;
+            }
         }
 
         ImGui::End();
@@ -600,20 +623,20 @@ int main() {
         }
 
 #ifndef __APPLE__
-        {
-            CompShader.use();
-            // glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-            glDispatchCompute((GLuint)width, (GLuint)height, 1);
-            glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
-
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
-
-            ScreenShader.use();
-            glActiveTexture(GL_TEXTURE0);
-            glBindTexture(GL_TEXTURE_2D, tex_output);
-            screen.DrawScreen();
-        }
+        // {
+        //     CompShader.use();
+        //     // glBindImageTexture(0, tex, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
+        //     glDispatchCompute((GLuint)width, (GLuint)height, 1);
+        //     glMemoryBarrier(GL_SHADER_IMAGE_ACCESS_BARRIER_BIT);
+        //
+        //     glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
+        //     glClear(GL_COLOR_BUFFER_BIT);
+        //
+        //     ScreenShader.use();
+        //     glActiveTexture(GL_TEXTURE0);
+        //     glBindTexture(GL_TEXTURE_2D, tex_output);
+        //     screen.DrawScreen();
+        // }
 #endif
 
         ImGui::Render();
