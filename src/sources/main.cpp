@@ -185,14 +185,16 @@ int main() {
 
     Material boy_glass;
     boy_glass.baseColor = vec3(1);
-    boy_glass.subsurface = 1.0;
+    boy_glass.mediumColor = vec3(0.54, 1, 0);
+    boy_glass.mediumDensity = 0.05;
+    boy_glass.mediumType = 1;
     boy_glass.specular = 1.0;
     boy_glass.transmission = 0.917;
     boy_glass.IOR = 1.45;
 
     // TODO GameObject
 
-    Material current_material = glass;
+    Material current_material = boy_glass;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
@@ -207,9 +209,9 @@ int main() {
    // getTriangle(teapot.meshes, triangles, current_material,
    //             getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
 
-    Model sphere("../../resources/objects/glassball.obj");
-    getTriangle(sphere.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, 90, 0), vec3(1.8, -1, 3), vec3(2)), true);
+    // Model sphere("../../resources/objects/glassball.obj");
+    // getTriangle(sphere.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, 90, 0), vec3(1.8, -1, 3), vec3(2)), true);
 
     // Model loong("../../resources/objects/loong.obj");        // 100000 face
     // getTriangle(loong.meshes, triangles, current_material,
@@ -220,13 +222,14 @@ int main() {
     // getTriangle(dragon.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
 
-    // Model boy_body("../../resources/objects/substance_boy/body.obj");
-    // getTriangle(boy_body.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, -110, 0), vec3(1.7, -1.25, 3.5), vec3(0.8)), true);
-    //
-    // Model boy_head("../../resources/objects/substance_boy/head.obj");
-    // getTriangle(boy_head.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, -95, 0), vec3(1.7, -0.33, 3.6), vec3(0.8)), true);
+
+    Model boy_body("../../resources/objects/substance_boy/body.obj");
+    getTriangle(boy_body.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, -85, 0), vec3(1.8, -1.25, 3.5), vec3(0.8)), true);
+
+    Model boy_head("../../resources/objects/substance_boy/head.obj");
+    getTriangle(boy_head.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, -85, 0), vec3(1.8, -0.33, 3.6), vec3(0.8)), true);
 
 #pragma endregion
 
@@ -446,9 +449,9 @@ int main() {
         ImGui::Checkbox("Enable ToneMapping", &enableToneMapping);
         ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
         ImGui::Separator();
-        ImGui::Checkbox("Demo Window", &show_demo_window);
-        if (show_demo_window)
-            ImGui::ShowDemoWindow(&show_demo_window);
+        // ImGui::Checkbox("Demo Window", &show_demo_window);
+        // if (show_demo_window)
+        //     ImGui::ShowDemoWindow(&show_demo_window);
         if (ImGui::Button("Save Image")) {
             SaveFrame("../../screenshot/screenshot_bunny_" + to_string(camera.LoopNum) + "_spp.png", width, height);
         }
@@ -456,7 +459,7 @@ int main() {
         if (ImGui::Checkbox("Enable BSDF Properties", &enableBSDF)) {
             camera.LoopNum = 0;
         }
-        if (ImGui::ColorEdit4("Base Color", baseColor)) {
+        if (ImGui::ColorEdit3("Base Color", baseColor)) {
             current_material.baseColor = vec3(baseColor[0], baseColor[1], baseColor[2]);
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;
@@ -493,7 +496,7 @@ int main() {
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;
         }
-        if (ImGui::ColorEdit4("Emissive", emissive)) {
+        if (ImGui::ColorEdit3("Emissive", emissive)) {
             current_material.emissive = vec3(emissive[0], emissive[1], emissive[2]);
             RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
             camera.LoopNum = 0;
@@ -534,7 +537,7 @@ int main() {
                 RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
                 camera.LoopNum = 0;
             }
-            if (ImGui::ColorEdit4("Medium Color", mediumColor)) {
+            if (ImGui::ColorEdit3("Medium Color", mediumColor)) {
                 current_material.mediumColor = vec3(mediumColor[0], mediumColor[1], mediumColor[2]);
                 RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
                 camera.LoopNum = 0;
