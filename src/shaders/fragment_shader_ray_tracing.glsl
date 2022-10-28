@@ -127,6 +127,9 @@ uniform bool enableMultiImportantSample;
 uniform bool enableEnvMap;
 uniform bool enableBSDF;
 
+uniform float envInvensity;
+uniform float envAngle;
+
 uniform int maxBounce;
 uniform int maxIterations;
 
@@ -624,7 +627,7 @@ vec2 toSphericalCoord(vec3 v) {
     uv /= vec2(2.0 * PI, PI);
     uv += 0.5;
     uv.y = 1.0 - uv.y;
-    return uv;
+    return uv + vec2(envAngle, 0);
 }
 
 // 采样预计算的 HDR cache
@@ -1242,7 +1245,7 @@ vec3 EvalTransmittance(Ray r)
 //                transmittance = vec3(0.0, 1.0, 0.0);
 ////                transmittance *= hdrColor(r.direction);
 //            }
-            transmittance *= hdrColor(r.direction);
+            transmittance *= hdrColor(r.direction) * envInvensity;
             break;
         }
 
@@ -1309,7 +1312,7 @@ vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
                 vec3 L = hdrTestRay.direction;
 
                 float   light_pdf   = hdrPdf(L, hdrResolution);
-                vec3    light_fr    = hdrColor(L);
+                vec3    light_fr    = hdrColor(L) * envInvensity;
 
                 float   disney_brdf_pdf;
                 vec3    disney_brdf_fr = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material, disney_brdf_pdf);
@@ -1342,7 +1345,7 @@ vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
         if(!newHit.isHit) {
             vec3 skyColor = vec3(0);
             if(enableEnvMap){
-                skyColor = hdrColor(L);
+                skyColor = hdrColor(L) * envInvensity;
                 float pdf_light = hdrPdf(L, hdrResolution);
 
                 float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
@@ -1387,7 +1390,7 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
                 vec3 L = hdrTestRay.direction;
 
                 float   light_pdf   = hdrPdf(L, hdrResolution);
-                vec3    light_fr    = hdrColor(L);
+                vec3    light_fr    = hdrColor(L) * envInvensity;
 
                 float   disney_eval_pdf;
                 vec3    disney_eval_fr = DisneyEval(hit.material, V, N, L, disney_eval_pdf);
@@ -1425,6 +1428,7 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
             else {
                 if (hit.material.medium.type == MEDIUM_ABSORB)
                 history *= exp(-(1.0 - hit.material.medium.color) * hit.distance * hit.material.medium.density);
+//                history *= exp(-(1.0 - hit.material.medium.color) * hit.distance * hit.distance * hit.distance * 0.05);
                 else if(hit.material.medium.type == MEDIUM_EMISSIVE)
                 Lo += hit.material.medium.color * hit.distance * hit.material.medium.density * history;
             }
@@ -1449,7 +1453,7 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
         if(!nextHit.isHit) {
             vec3 light_fr = vec3(0);
             if(enableEnvMap) {
-                light_fr = hdrColor(L);
+                light_fr = hdrColor(L) * envInvensity;
 
                 float light_pdf = hdrPdf(L, hdrResolution);
                 float mis_weight = misMixWeight(disney_eval_pdf, light_pdf);
@@ -1493,7 +1497,7 @@ void main() {
 
         if(!firstHit.isHit) {
             if(enableEnvMap) {
-                curColor = hdrColor(cameraRay.direction);
+                curColor = hdrColor(cameraRay.direction) * envInvensity;
             }
             else {
                 curColor = getDefaultSkyColor(cameraRay.direction.y);

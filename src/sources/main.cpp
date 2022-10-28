@@ -38,7 +38,7 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 // Settings
-const unsigned int SCR_WIDTH = 512;
+const unsigned int SCR_WIDTH = 1024;
 const unsigned int SCR_HEIGHT = 512;
 #define RENDER_SCALE 1
 #define MAX_BOUNCE 4
@@ -180,7 +180,7 @@ int main() {
     dragon_glass.baseColor = vec3(1);
     dragon_glass.mediumType = 1;
     dragon_glass.mediumColor = vec3(0.905, 0.63, 0.3);
-    dragon_glass.mediumDensity = 1;
+    dragon_glass.mediumDensity = 0.75;
     dragon_glass.specular = 1.0;
     dragon_glass.transmission = 1.0;
     dragon_glass.IOR = 1.45;
@@ -220,10 +220,14 @@ int main() {
     // getTriangle(loong.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
 
-    camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
-    Model dragon("../../resources/objects/dragon.obj");     // 831812 face
-    getTriangle(dragon.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, 115, 0), vec3(-0.2, -1.8, 3), vec3(3)), true);
+    // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
+    // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
+    // getTriangle(dragon.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, 130, 0), vec3(-0.2, -1.8, 3), vec3(3)), true);
+
+    Model panther("../../resources/objects/panther.obj");     // 831812 face
+    getTriangle(panther.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, 0, 0), vec3(2, -2, 4), vec3(6.5)), true);
 
 
     // Model boy_body("../../resources/objects/substance_boy/body.obj");
@@ -313,7 +317,9 @@ int main() {
     // HDR Environment Map
     // -------------------
     HDRLoaderResult hdrRes;
-    bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_1k.hdr", hdrRes);
+    // bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_1k.hdr", hdrRes);
+    bool r = HDRLoader::load("../../resources/textures/hdr/sunset.hdr", hdrRes);
+
     hdrMap = getTextureRGB32F(hdrRes.width, hdrRes.height);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, hdrRes.cols);
 
@@ -350,8 +356,10 @@ int main() {
     bool enableToneMapping = true;
     bool enableGammaCorrection = true;
     bool enableBSDF = true;
+    float envInvensity = 5;
+    float envAngle = 0.33;
     int maxBounce = 4;
-    int maxIterations = 1000;
+    int maxIterations = 5;
     for (int i = 0; i < 3; ++i) {
         cameraPosition[i] = camera.Position[i];
         cameraRotation[i] = camera.Rotation[i];
@@ -420,6 +428,14 @@ int main() {
         ImGui::Separator();
         if (ImGui::Checkbox("Enable HDR EnvMap", &enableEnvMap)) {
             camera.LoopNum = 0;
+        }
+        if (enableEnvMap) {
+            if (ImGui::SliderFloat("Env Invensity", &envInvensity, 0, 10)) {
+                camera.LoopNum = 0;
+            }
+            if (ImGui::SliderFloat("Env Angle", &envAngle, -1, 1)) {
+                camera.LoopNum = 0;
+            }
         }
         if (ImGui::Checkbox("Enable Multi-Important Sampling", &enableMultiImportantSample)) {
             camera.LoopNum = 0;
@@ -597,6 +613,8 @@ int main() {
             RayTracerShader.setInt("screenHeight", height);
             RayTracerShader.setBool("enableMultiImportantSample", enableMultiImportantSample);
             RayTracerShader.setBool("enableEnvMap", enableEnvMap);
+            RayTracerShader.setFloat("envInvensity", envInvensity);
+            RayTracerShader.setFloat("envAngle", envAngle);
             RayTracerShader.setInt("maxBounce", maxBounce);
             RayTracerShader.setInt("maxIterations", maxIterations);
             RayTracerShader.setBool("enableBSDF", enableBSDF);
