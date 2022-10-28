@@ -39,9 +39,9 @@ void processInput(GLFWwindow *window);
 
 // Settings
 const unsigned int SCR_WIDTH = 1024;
-const unsigned int SCR_HEIGHT = 512;
+const unsigned int SCR_HEIGHT = 437;
 #define RENDER_SCALE 1
-#define MAX_BOUNCE 4
+#define MAX_BOUNCE 8
 
 // Camera
 Camera camera((float) SCR_WIDTH / (float) SCR_HEIGHT,
@@ -188,8 +188,8 @@ int main() {
 
     Material boy_glass;
     boy_glass.baseColor = vec3(1);
-    boy_glass.mediumColor = vec3(0.54, 1, 0);
-    boy_glass.mediumDensity = 0.05;
+    boy_glass.mediumColor = vec3(0.085, 0.917, 0.848);
+    boy_glass.mediumDensity = 1;
     boy_glass.mediumType = 1;
     boy_glass.specular = 1.0;
     boy_glass.transmission = 0.917;
@@ -197,7 +197,7 @@ int main() {
 
     // TODO GameObject
 
-    Material current_material = dragon_glass;
+    Material current_material = boy_glass;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
@@ -216,19 +216,18 @@ int main() {
     // getTriangle(sphere.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0, 90, 0), vec3(1.8, -1, 3), vec3(2)), true);
 
-    // Model loong("../../resources/objects/loong.obj");        // 100000 face
-    // getTriangle(loong.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
+     Model loong("../../resources/objects/loong.obj");        // 100000 face
+     getTriangle(loong.meshes, triangles, current_material,
+                 getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
 
     // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
     // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
     // getTriangle(dragon.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0, 130, 0), vec3(-0.2, -1.8, 3), vec3(3)), true);
 
-    Model panther("../../resources/objects/panther.obj");     // 831812 face
-    getTriangle(panther.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, 0, 0), vec3(2, -2, 4), vec3(6.5)), true);
-
+//    Model panther("../../resources/objects/panther.obj");     // 831812 face
+//    getTriangle(panther.meshes, triangles, current_material,
+//                getTransformMatrix(vec3(0, -30, 0), vec3(0.9, -2.1, 5), vec3(5)), true);
 
     // Model boy_body("../../resources/objects/substance_boy/body.obj");
     // getTriangle(boy_body.meshes, triangles, current_material,
@@ -317,8 +316,8 @@ int main() {
     // HDR Environment Map
     // -------------------
     HDRLoaderResult hdrRes;
-    // bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_1k.hdr", hdrRes);
-    bool r = HDRLoader::load("../../resources/textures/hdr/sunset.hdr", hdrRes);
+     bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_1k.hdr", hdrRes);
+//    bool r = HDRLoader::load("../../resources/textures/hdr/sunset.hdr", hdrRes);
 
     hdrMap = getTextureRGB32F(hdrRes.width, hdrRes.height);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, hdrRes.cols);
@@ -356,10 +355,10 @@ int main() {
     bool enableToneMapping = true;
     bool enableGammaCorrection = true;
     bool enableBSDF = true;
-    float envInvensity = 5;
-    float envAngle = 0.33;
-    int maxBounce = 4;
-    int maxIterations = 5;
+    float envInvensity = 1;
+    float envAngle = 0;//0.33;
+    int maxBounce = 8;
+    int maxIterations = 3000;
     for (int i = 0; i < 3; ++i) {
         cameraPosition[i] = camera.Position[i];
         cameraRotation[i] = camera.Rotation[i];
