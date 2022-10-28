@@ -39,7 +39,7 @@ void processInput(GLFWwindow *window);
 
 // Settings
 const unsigned int SCR_WIDTH = 1024;
-const unsigned int SCR_HEIGHT = 437;
+const unsigned int SCR_HEIGHT = 512;
 #define RENDER_SCALE 1
 #define MAX_BOUNCE 8
 
@@ -180,11 +180,11 @@ int main() {
     dragon_glass.baseColor = vec3(1);
     dragon_glass.mediumType = 1;
     dragon_glass.mediumColor = vec3(0.905, 0.63, 0.3);
-    dragon_glass.mediumDensity = 0.75;
+    dragon_glass.mediumDensity = 1; //0.75
     dragon_glass.specular = 1.0;
-    dragon_glass.transmission = 1.0;
+    dragon_glass.transmission = 0.957;
     dragon_glass.IOR = 1.45;
-    dragon_glass.roughness = 0.18;
+    dragon_glass.roughness = 0.1;
 
     Material boy_glass;
     boy_glass.baseColor = vec3(1);
@@ -197,7 +197,7 @@ int main() {
 
     // TODO GameObject
 
-    Material current_material = boy_glass;
+    Material current_material = dragon_glass;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
@@ -208,26 +208,26 @@ int main() {
     // getTriangle(bunny.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
 
-   // Model teapot("../../resources/objects/renderman/teapot.obj");
-   // getTriangle(teapot.meshes, triangles, current_material,
-   //             getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
+    // Model teapot("../../resources/objects/renderman/teapot.obj");
+    // getTriangle(teapot.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
 
     // Model sphere("../../resources/objects/glassball.obj");
     // getTriangle(sphere.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0, 90, 0), vec3(1.8, -1, 3), vec3(2)), true);
 
-     Model loong("../../resources/objects/loong.obj");        // 100000 face
-     getTriangle(loong.meshes, triangles, current_material,
-                 getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
+    //Model loong("../../resources/objects/loong.obj");        // 100000 face
+    //getTriangle(loong.meshes, triangles, current_material,
+    //            getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
 
     // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
     // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
     // getTriangle(dragon.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0, 130, 0), vec3(-0.2, -1.8, 3), vec3(3)), true);
 
-//    Model panther("../../resources/objects/panther.obj");     // 831812 face
-//    getTriangle(panther.meshes, triangles, current_material,
-//                getTransformMatrix(vec3(0, -30, 0), vec3(0.9, -2.1, 5), vec3(5)), true);
+    Model panther("../../resources/objects/panther.obj");     // 831812 face
+    getTriangle(panther.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, -30, 0), vec3(0.9, -2.1, 5), vec3(5)), true);
 
     // Model boy_body("../../resources/objects/substance_boy/body.obj");
     // getTriangle(boy_body.meshes, triangles, current_material,
