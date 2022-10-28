@@ -471,7 +471,7 @@ int main() {
         // if (show_demo_window)
         //     ImGui::ShowDemoWindow(&show_demo_window);
         if (ImGui::Button("Save Image")) {
-            SaveFrame("../../screenshot/screenshot_bunny_" + to_string(camera.LoopNum) + "_spp.png", width, height);
+            SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + "_spp.png", width, height);
         }
         ImGui::Separator();
         if (ImGui::Checkbox("Enable BSDF Properties", &enableBSDF)) {
@@ -698,6 +698,12 @@ void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
         camera.ProcessKeyboard(DOWN, deltaTime);
 
+    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS){
+        int width = 0;
+        int height = 0;
+        glfwGetFramebufferSize(window, &width, &height);
+        SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + "_spp.png", width, height);
+    }
     for (int i = 0; i < 3; ++i) {
         cameraPosition[i] = camera.Position[i];
     }
