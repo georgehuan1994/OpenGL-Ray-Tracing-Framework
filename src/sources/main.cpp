@@ -38,7 +38,7 @@ void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
 void processInput(GLFWwindow *window);
 
 // Settings
-const unsigned int SCR_WIDTH = 1024;
+const unsigned int SCR_WIDTH = 512;
 const unsigned int SCR_HEIGHT = 512;
 #define RENDER_SCALE 1
 #define MAX_BOUNCE 4
@@ -170,18 +170,21 @@ int main() {
     copper.metallic = 1.0;
 
     Material glass;
-    glass.baseColor = vec3(1, 1, 1);
+    glass.baseColor = vec3(1);
     glass.specular = 1.0;
     glass.transmission = 1.0;
     glass.IOR = 1.5;
     glass.roughness = 0.02;
 
-    Material green_glass;
-    green_glass.baseColor = vec3(0.54, 1, 0);
-    green_glass.specular = 1.0;
-    green_glass.transmission = 0.917;
-    green_glass.IOR = 1.45;
-    green_glass.roughness = 0.18;
+    Material dragon_glass;
+    dragon_glass.baseColor = vec3(1);
+    dragon_glass.mediumType = 1;
+    dragon_glass.mediumColor = vec3(0.905, 0.63, 0.3);
+    dragon_glass.mediumDensity = 1;
+    dragon_glass.specular = 1.0;
+    dragon_glass.transmission = 1.0;
+    dragon_glass.IOR = 1.45;
+    dragon_glass.roughness = 0.18;
 
     Material boy_glass;
     boy_glass.baseColor = vec3(1);
@@ -194,7 +197,7 @@ int main() {
 
     // TODO GameObject
 
-    Material current_material = boy_glass;
+    Material current_material = dragon_glass;
     SetGlobalMaterialProperty(current_material);
 
     Model floor("../../resources/objects/floor.obj");
@@ -217,19 +220,19 @@ int main() {
     // getTriangle(loong.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
 
-    // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
-    // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
-    // getTriangle(dragon.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, 120, 0), vec3(-0.2, -2.5, 3), vec3(4)), false);
+    camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
+    Model dragon("../../resources/objects/dragon.obj");     // 831812 face
+    getTriangle(dragon.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, 115, 0), vec3(-0.2, -1.8, 3), vec3(3)), true);
 
 
-    Model boy_body("../../resources/objects/substance_boy/body.obj");
-    getTriangle(boy_body.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -85, 0), vec3(1.8, -1.25, 3.5), vec3(0.8)), true);
-
-    Model boy_head("../../resources/objects/substance_boy/head.obj");
-    getTriangle(boy_head.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -85, 0), vec3(1.8, -0.33, 3.6), vec3(0.8)), true);
+    // Model boy_body("../../resources/objects/substance_boy/body.obj");
+    // getTriangle(boy_body.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, -85, 0), vec3(1.8, -1.25, 3.5), vec3(0.8)), true);
+    //
+    // Model boy_head("../../resources/objects/substance_boy/head.obj");
+    // getTriangle(boy_head.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, -85, 0), vec3(1.8, -0.33, 3.6), vec3(0.8)), true);
 
 #pragma endregion
 

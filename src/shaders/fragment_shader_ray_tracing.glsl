@@ -1425,9 +1425,8 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
             else {
                 if (hit.material.medium.type == MEDIUM_ABSORB)
                 history *= exp(-(1.0 - hit.material.medium.color) * hit.distance * hit.material.medium.density);
-
-                // medium.type == MEDIUM_EMISSIVE
-                // Lo += hit.material.medium.color * hit.distance * hit.material.medium.density * history;
+                else if(hit.material.medium.type == MEDIUM_EMISSIVE)
+                Lo += hit.material.medium.color * hit.distance * hit.material.medium.density * history;
             }
         }
         else {
