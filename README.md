@@ -35,7 +35,7 @@ After [《Ray Tracing in One Weekend Book Series》](https://github.com/RayTraci
 
 ## TODO
 
-- [ ] Subsurface Scattering
+- [ ] Volume Scattering
 - [ ] Compute Shader (WINDOWS only, OSX supports up to native OpenGL version 4.1)
 - [ ] Texture Mapping
 - [ ] Material Instances

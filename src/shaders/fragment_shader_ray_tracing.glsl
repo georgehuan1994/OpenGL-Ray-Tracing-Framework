@@ -127,7 +127,7 @@ uniform bool enableMultiImportantSample;
 uniform bool enableEnvMap;
 uniform bool enableBSDF;
 
-uniform float envInvensity;
+uniform float envIntensity;
 uniform float envAngle;
 
 uniform int maxBounce;
@@ -1245,7 +1245,7 @@ vec3 EvalTransmittance(Ray r)
 //                transmittance = vec3(0.0, 1.0, 0.0);
 ////                transmittance *= hdrColor(r.direction);
 //            }
-            transmittance *= hdrColor(r.direction) * envInvensity;
+            transmittance *= hdrColor(r.direction) * envIntensity;
             break;
         }
 
@@ -1312,7 +1312,7 @@ vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
                 vec3 L = hdrTestRay.direction;
 
                 float   light_pdf   = hdrPdf(L, hdrResolution);
-                vec3    light_fr    = hdrColor(L) * envInvensity;
+                vec3    light_fr    = hdrColor(L) * envIntensity;
 
                 float   disney_brdf_pdf;
                 vec3    disney_brdf_fr = BRDF_Evaluate(V, N, L, tangent, bitangent, hit.material, disney_brdf_pdf);
@@ -1345,7 +1345,7 @@ vec3 shadingImportanceSampling_BRDF(HitRecord hit) {
         if(!newHit.isHit) {
             vec3 skyColor = vec3(0);
             if(enableEnvMap){
-                skyColor = hdrColor(L) * envInvensity;
+                skyColor = hdrColor(L) * envIntensity;
                 float pdf_light = hdrPdf(L, hdrResolution);
 
                 float mis_weight = misMixWeight(pdf_brdf, pdf_light);   // f(a,b) = a^2 / (a^2 + b^2)
@@ -1390,7 +1390,7 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
                 vec3 L = hdrTestRay.direction;
 
                 float   light_pdf   = hdrPdf(L, hdrResolution);
-                vec3    light_fr    = hdrColor(L) * envInvensity;
+                vec3    light_fr    = hdrColor(L) * envIntensity;
 
                 float   disney_eval_pdf;
                 vec3    disney_eval_fr = DisneyEval(hit.material, V, N, L, disney_eval_pdf);
@@ -1420,17 +1420,41 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
         bool isRefract;
         disney_sample_fr = DisneySample(xi_1, xi_2, xi_3, hit.material, V, N, L, disney_sample_pdf, isRefract);
 
+
+        bool mediumSampled = false;
+        float scatter_pdf = 0.0;
+        float transmittance = 1.0;
+
         // Cumulative the Color
         if (disney_sample_pdf > 0.0) {
             if (!isRefract) {
                 history *= disney_sample_fr / disney_sample_pdf;
             }
             else {
-                if (hit.material.medium.type == MEDIUM_ABSORB)
-                history *= exp(-(1.0 - hit.material.medium.color) * hit.distance * hit.material.medium.density);
-//                history *= exp(-(1.0 - hit.material.medium.color) * hit.distance * hit.distance * hit.distance * 0.05);
-                else if(hit.material.medium.type == MEDIUM_EMISSIVE)
-                Lo += hit.material.medium.color * hit.distance * hit.material.medium.density * history;
+                if (hit.material.medium.type == MEDIUM_ABSORB) {
+                    history *= exp(-(1.0 - hit.material.medium.color) * hit.distance * hit.material.medium.density);
+                }
+                else if(hit.material.medium.type == MEDIUM_EMISSIVE) {
+                    Lo += hit.material.medium.color * hit.distance * hit.material.medium.density * history;
+                }
+                else if(hit.material.medium.type == MEDIUM_SCATTER) {
+                    float scatterDist = min(-log(xi_3) / hit.material.medium.density, hit.distance);
+                    mediumSampled = scatterDist < hit.distance;
+
+                    if (mediumSampled)
+                    {
+                        transmittance *= exp(-1.0 * scatterDist);
+                        history *= hit.material.medium.color * transmittance;
+
+                        // Move ray origin to scattering position
+                        hit.hitPoint += hit.viewDir * scatterDist;
+
+                        // Pick a new direction based on the phase function
+                        vec3 scatterDir = SampleHG(V, hit.material.medium.anisotropy, xi_1, xi_2);
+                        scatter_pdf = PhaseHG(dot(V, scatterDir), hit.material.medium.anisotropy);
+                        L = scatterDir;
+                    }
+                }
             }
         }
         else {
@@ -1443,6 +1467,12 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
         vec3  disney_eval_fr      = vec3(0);
         disney_eval_fr = DisneyEval(hit.material, V, N, L, disney_eval_pdf);
 
+        // Medium Sampled
+        if (mediumSampled && scatter_pdf > 0.0) {
+            disney_eval_pdf = scatter_pdf;
+            disney_eval_fr = vec3(scatter_pdf);
+        }
+
         Ray randomRay;
         randomRay.origin        = hit.hitPoint;
         randomRay.direction     = L;
@@ -1453,7 +1483,7 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
         if(!nextHit.isHit) {
             vec3 light_fr = vec3(0);
             if(enableEnvMap) {
-                light_fr = hdrColor(L) * envInvensity;
+                light_fr = hdrColor(L) * envIntensity;
 
                 float light_pdf = hdrPdf(L, hdrResolution);
                 float mis_weight = misMixWeight(disney_eval_pdf, light_pdf);
@@ -1462,7 +1492,11 @@ vec3 shadingImportanceSampling_BSDF(HitRecord hit) {
                     mis_weight = 1.0;
                 }
 
+                if (!mediumSampled)
                 Lo += mis_weight * history * light_fr * disney_eval_fr / disney_eval_pdf;
+                else
+                Lo += history * light_fr * disney_eval_fr / light_pdf;
+
             }
             else {
                 light_fr = getDefaultSkyColor(randomRay.direction.y);
@@ -1497,7 +1531,7 @@ void main() {
 
         if(!firstHit.isHit) {
             if(enableEnvMap) {
-                curColor = hdrColor(cameraRay.direction) * envInvensity;
+                curColor = hdrColor(cameraRay.direction) * envIntensity;
             }
             else {
                 curColor = getDefaultSkyColor(cameraRay.direction.y);

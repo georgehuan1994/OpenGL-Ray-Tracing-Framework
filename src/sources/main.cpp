@@ -1,3 +1,7 @@
+//
+// Created by George Huan on 2022/10/2.
+//
+
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
@@ -7,6 +11,7 @@
 
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
+
 #include "stb_image.h"
 #include "stb_image_write.h"
 #include "stb_image_resize.h"
@@ -25,57 +30,22 @@
 
 #include "hdrloader.h"
 
+#include "RenderSettings.h"
+#include "Scene.h"
+
 #include <iostream>
 
 using namespace glm;
 
-void framebuffer_size_callback(GLFWwindow *window, int width, int height);
-
-void mouse_callback(GLFWwindow *window, double xpos, double ypos);
-
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
-
 void processInput(GLFWwindow *window);
-
-// Settings
-const unsigned int SCR_WIDTH = 1024;
-const unsigned int SCR_HEIGHT = 512;
-#define RENDER_SCALE 1
-#define MAX_BOUNCE 8
-
-// Camera
-Camera camera((float) SCR_WIDTH / (float) SCR_HEIGHT,
-              glm::vec3(0.0f, 0.0f, 7.0f),
-              glm::vec3(-87.78f, -14.0f, 0.0f));
-static float cameraPosition[3] = {camera.Position.x, camera.Position.y, camera.Position.z};
-static float cameraRotation[3] = {camera.Rotation.x, camera.Rotation.y, camera.Rotation.z};
-static float cameraZoom = 25.0f;
-
-float lastX = SCR_WIDTH / 2.0f;
-float lastY = SCR_HEIGHT / 2.0f;
-bool firstMouse = true;
-
-// Timer
-float deltaTime = 0.0f;
-float lastFrame = 0.0f;
-float fps = 0.0f;
-
-// Screen FBO
-RenderBuffer screenBuffer;
-
-// Triangle Texture Buffer Data
-GLuint trianglesTextureBuffer;
-
-// BVH Node Texture Buffer Data
-GLuint nodesTextureBuffer;
-
-// HDR Map Data
-GLuint hdrMap;
-GLuint hdrCache;
-int hdrResolution;
+void mouse_callback(GLFWwindow *window, double xpos, double ypos);
+void mouse_scroll_callback(GLFWwindow *window, double xoffset, double yoffset);
+void framebuffer_size_callback(GLFWwindow *window, int width, int height);
+void OnGUI(vector<Triangle_encoded> &triangles_encoded, GLuint tbo0);
 
 int main() {
 
+#pragma region OpenGL Stuff
     glfwInit();
 #ifdef __APPLE__
     const char *glsl_version = "#version 410";
@@ -92,7 +62,7 @@ int main() {
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 #endif
 
-    GLFWwindow *window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Ray Tracing Framework", nullptr, nullptr);
+    window = glfwCreateWindow(SCR_WIDTH, SCR_HEIGHT, "OpenGL Ray Tracing Framework", nullptr, nullptr);
     if (window == nullptr) {
         std::cout << "Failed to create GLFW window" << std::endl;
         glfwTerminate();
@@ -101,7 +71,7 @@ int main() {
     glfwMakeContextCurrent(window);
     glfwSetFramebufferSizeCallback(window, framebuffer_size_callback);
     glfwSetCursorPosCallback(window, mouse_callback);
-    glfwSetScrollCallback(window, scroll_callback);
+    glfwSetScrollCallback(window, mouse_scroll_callback);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
     if (!gladLoadGLLoader((GLADloadproc) glfwGetProcAddress)) {
@@ -109,151 +79,51 @@ int main() {
         return -1;
     }
 
-    int width, height;
     glfwGetFramebufferSize(window, &width, &height);
     glViewport(0, 0, width * RENDER_SCALE, height * RENDER_SCALE);
+#pragma endregion
 
-    // stbi_set_flip_vertically_on_load(true);
-
+    // Init Random Seed
+    // ----------------
     CPURandomInit();
 
     // Build and Compile Shaders
     // -------------------------
-    const char *vertexShaderPath = "../../src/shaders/vertex_shader.glsl";
-    Shader RayTracerShader(vertexShaderPath,"../../src/shaders/fragment_shader_ray_tracing.glsl");
-    Shader ScreenShader(vertexShaderPath, "../../src/shaders/fragment_shader_screen.glsl");
-    Shader ToneMappingShader(vertexShaderPath,"../../src/shaders/fragment_shader_tone_mapping.glsl");
+    Shader ScreenShader(vertexShaderPath, fragmentShaderScreenPath);
+    Shader RayTracerShader(vertexShaderPath, fragmentShaderRayTracingPath);
+    Shader ToneMappingShader(vertexShaderPath, fragmentShaderToneMapping);
 
 #ifndef __APPLE__
     // Shader CompShader("../../src/shaders/compute_shader_test.glsl");
 #endif
 
-    Screen screen;
+    // Bind VAO, VBO
+    // -------------
     screen.InitScreenBind();
+
+    // Init FBO
+    // --------
     screenBuffer.Init(width * RENDER_SCALE, height * RENDER_SCALE);
 
-    RayTracerShader.use();
+#pragma region Scene/Triangle/BVH
 
-    std::vector<Triangle> triangles;
-
-
-#pragma region Scene
-
-    Material plane;
-    plane.baseColor = vec3(0.73, 0.73, 0.73);
-    plane.specular = 1.0;
-    plane.IOR = 1.79;        // bsdf specular
-    plane.metallic = 0.2;
-
-    Material white;
-    white.baseColor = vec3(0.73, 0.73, 0.73);
-    white.roughness = 0.5;
-    white.specular = 0.5;
-
-    Material jade;
-    jade.baseColor = vec3(0.55, 0.78, 0.55);
-    jade.specular = 1.0;
-    jade.IOR = 1.79;
-    jade.subsurface = 1.0;
-
-    Material golden;
-    golden.baseColor = vec3(0.75, 0.7, 0.15);
-    golden.roughness = 0.05;
-    golden.specular = 1.0;
-    golden.metallic = 1.0;
-
-    Material copper;
-    copper.baseColor = vec3(238.0f / 255.0f, 158.0f / 255.0f, 137.0f / 255.0f);
-    copper.roughness = 0.2;
-    copper.specular = 1.0;
-    copper.IOR = 1.21901;
-    copper.metallic = 1.0;
-
-    Material glass;
-    glass.baseColor = vec3(1);
-    glass.specular = 1.0;
-    glass.transmission = 1.0;
-    glass.IOR = 1.5;
-    glass.roughness = 0.02;
-
-    Material dragon_glass;
-    dragon_glass.baseColor = vec3(1);
-    dragon_glass.mediumType = 1;
-    dragon_glass.mediumColor = vec3(0.905, 0.63, 0.3);
-    dragon_glass.mediumDensity = 1; //0.75
-    dragon_glass.specular = 1.0;
-    dragon_glass.transmission = 0.957;
-    dragon_glass.IOR = 1.45;
-    dragon_glass.roughness = 0.1;
-
-    Material boy_glass;
-    boy_glass.baseColor = vec3(1);
-    boy_glass.mediumColor = vec3(0.085, 0.917, 0.848);
-    boy_glass.mediumDensity = 1;
-    boy_glass.mediumType = 1;
-    boy_glass.specular = 1.0;
-    boy_glass.transmission = 0.917;
-    boy_glass.IOR = 1.45;
-
-    // TODO GameObject
-
-    Material current_material = dragon_glass;
-    SetGlobalMaterialProperty(current_material);
-
-    Model floor("../../resources/objects/floor.obj");
-    getTriangle(floor.meshes, triangles, plane,
-                getTransformMatrix(vec3(0), vec3(2.2, -2, 3), vec3(14, 7, 7)), false);
-
-    // Model bunny("../../resources/objects/bunny_4000.obj");   // 4000 face
-    // getTriangle(bunny.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0), vec3(2.2, -2.5, 3), vec3(2)), false);
-
-    // Model teapot("../../resources/objects/renderman/teapot.obj");
-    // getTriangle(teapot.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
-
-    // Model sphere("../../resources/objects/glassball.obj");
-    // getTriangle(sphere.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, 90, 0), vec3(1.8, -1, 3), vec3(2)), true);
-
-    //Model loong("../../resources/objects/loong.obj");        // 100000 face
-    //getTriangle(loong.meshes, triangles, current_material,
-    //            getTransformMatrix(vec3(0), vec3(2, -2, 3), vec3(3.5)), true);
-
-    // camera.Rotation = glm::vec3(-90.0f, -14.0f, 0.0f);
-    // Model dragon("../../resources/objects/dragon.obj");     // 831812 face
-    // getTriangle(dragon.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, 130, 0), vec3(-0.2, -1.8, 3), vec3(3)), true);
-
-    Model panther("../../resources/objects/panther.obj");     // 831812 face
-    getTriangle(panther.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, -30, 0), vec3(0.9, -2.1, 5), vec3(5)), true);
-
-    // Model boy_body("../../resources/objects/substance_boy/body.obj");
-    // getTriangle(boy_body.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, -85, 0), vec3(1.8, -1.25, 3.5), vec3(0.8)), true);
-    //
-    // Model boy_head("../../resources/objects/substance_boy/head.obj");
-    // getTriangle(boy_head.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, -85, 0), vec3(1.8, -0.33, 3.6), vec3(0.8)), true);
-
-#pragma endregion
-
-    int nTriangles = triangles.size();
-    std::cout << "Scene loading completed: " << nTriangles << " triangle faces in total" << std::endl;
+    // Init Scene
+    // ----------
+    InitScene();
 
     // Build BVH Node Data
     // -------------------
-    BVHNode testNode;
-    testNode.left = 255;
-    testNode.right = 128;
-    testNode.n = 30;
-    testNode.AA = vec3(1, 1, 0);
-    testNode.BB = vec3(0, 1, 0);
-    std::vector<BVHNode> nodes{testNode};
+    BVHNode bvhTestNode;
+    bvhTestNode.left = 255;
+    bvhTestNode.right = 128;
+    bvhTestNode.n = 30;
+    bvhTestNode.AA = vec3(1, 1, 0);
+    bvhTestNode.BB = vec3(0, 1, 0);
+    std::vector<BVHNode> nodes{bvhTestNode};
     // buildBVH(triangles, nodes, 0, triangles.size() - 1, 8);
     buildBVHwithSAH(triangles, nodes, 0, triangles.size() - 1, 8);
-    int nNodes = nodes.size();
+
+    nNodes = nodes.size();
     std::cout << "BVH building completed: " << nNodes << " nodes in total" << std::endl;
 
     // Encode Triangle Data
@@ -280,7 +150,6 @@ int main() {
         triangles_encoded[i].mediumColor = m.mediumColor;
         triangles_encoded[i].param5 = vec3(m.mediumType, m.mediumDensity, m.mediumAnisotropy);
     }
-    RayTracerShader.setInt("nTriangles", nTriangles);
 
     // Encode BVHNode and AABB
     // -----------------------
@@ -291,7 +160,6 @@ int main() {
         nodes_encoded[i].AA = nodes[i].AA;
         nodes_encoded[i].BB = nodes[i].BB;
     }
-    RayTracerShader.setInt("nNodes", nodes.size());
 
     // Triangle Texture Buffer
     // -----------------------
@@ -313,60 +181,8 @@ int main() {
     glBindTexture(GL_TEXTURE_BUFFER, nodesTextureBuffer);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo1);
 
-    // HDR Environment Map
-    // -------------------
-    HDRLoaderResult hdrRes;
-     bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_1k.hdr", hdrRes);
-//    bool r = HDRLoader::load("../../resources/textures/hdr/sunset.hdr", hdrRes);
-
-    hdrMap = getTextureRGB32F(hdrRes.width, hdrRes.height);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, hdrRes.cols);
-
-    // HDR Important Sampling Cache
-    // ----------------------------
-    std::cout << "HDR Map Important Sample Cache, HDR Resolution: " << hdrRes.width << " x " << hdrRes.height << std::endl;
-    float* cache = calculateHdrCache(hdrRes.cols, hdrRes.width, hdrRes.height);
-    hdrCache = getTextureRGB32F(hdrRes.width, hdrRes.height);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB32F, hdrRes.width, hdrRes.height, 0, GL_RGB, GL_FLOAT, cache);
-    hdrResolution = hdrRes.width;
-
-    // Setup Dear ImGui Context
-    // ------------------------
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    ImGuiIO &io = ImGui::GetIO();
-    (void) io;
-
-    // Setup Dear ImGui style
-    // ----------------------
-    ImGui::StyleColorsClassic();
-    ImGui_ImplGlfw_InitForOpenGL(window, true);
-    ImGui_ImplOpenGL3_Init(glsl_version);
-
-    camera.Refresh();
-
-    // glEnable(GL_DEPTH_TEST);
-    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
-
-    // Render Setting
-    bool show_demo_window = false;
-    bool enableMultiImportantSample = true;
-    bool enableEnvMap = true;
-    bool enableToneMapping = true;
-    bool enableGammaCorrection = true;
-    bool enableBSDF = true;
-    float envInvensity = 1;
-    float envAngle = 0;//0.33;
-    int maxBounce = 8;
-    int maxIterations = 3000;
-    for (int i = 0; i < 3; ++i) {
-        cameraPosition[i] = camera.Position[i];
-        cameraRotation[i] = camera.Rotation[i];
-    }
-
 #ifndef __APPLE__
     // // dimensions of the image
-    // GLuint tex_output;
     // glGenTextures(1, &tex_output);
     // glActiveTexture(GL_TEXTURE0);
     // glBindTexture(GL_TEXTURE_2D, tex_output);
@@ -398,6 +214,53 @@ int main() {
     // glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
     // printf("max local work group invocations %i\n", work_grp_inv);
 #endif
+#pragma endregion
+
+    // glEnable(GL_DEPTH_TEST);
+    // glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
+    // Setup Dear ImGui Context
+    // ------------------------
+    IMGUI_CHECKVERSION();
+    ImGui::CreateContext();
+    ImGuiIO &io = ImGui::GetIO();
+    (void) io;
+
+    // Setup Dear ImGui style
+    // ----------------------
+    ImGui::StyleColorsClassic();
+    ImGui_ImplGlfw_InitForOpenGL(window, true);
+    ImGui_ImplOpenGL3_Init(glsl_version);
+
+    RayTracerShader.use();
+
+    RayTracerShader.setInt("nTriangles", nTriangles);
+    RayTracerShader.setInt("nNodes", nodes.size());
+
+    RayTracerShader.setInt("hdrResolution", hdrResolution);
+    RayTracerShader.setInt("historyTexture", 0);
+
+    glActiveTexture(GL_TEXTURE0 + 1);
+    glBindTexture(GL_TEXTURE_BUFFER, trianglesTextureBuffer);
+    RayTracerShader.setInt("triangles", 1);
+
+    glActiveTexture(GL_TEXTURE0 + 2);
+    glBindTexture(GL_TEXTURE_BUFFER, nodesTextureBuffer);
+    RayTracerShader.setInt("nodes", 2);
+
+    glActiveTexture(GL_TEXTURE0 + 3);
+    glBindTexture(GL_TEXTURE_2D, hdrMap);
+    RayTracerShader.setInt("hdrMap", 3);
+
+    glActiveTexture(GL_TEXTURE0 + 4);
+    glBindTexture(GL_TEXTURE_2D, hdrCache);
+    RayTracerShader.setInt("hdrCache", 4);
+
+    camera.Refresh();
+    for (int i = 0; i < 3; ++i) {
+        cameraPosition[i] = camera.Position[i];
+        cameraRotation[i] = camera.Rotation[i];
+    }
 
     // Render Loop
     // -----------
@@ -409,194 +272,13 @@ int main() {
 
         processInput(window);
 
-        ImGui_ImplOpenGL3_NewFrame();
-        ImGui_ImplGlfw_NewFrame();
-        ImGui::NewFrame();
-
-        glfwGetFramebufferSize(window, &width, &height);
-        ImGuiWindowFlags window_flags = 0;
-        window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
-#if __APPLE__
-        ImGui::SetNextWindowSizeConstraints(ImVec2(10,10), ImVec2(width, height / 2.0 - 20));
-#else
-        ImGui::SetNextWindowSizeConstraints(ImVec2(10,10), ImVec2(width, height - 20));
-#endif
-        ImGui::Begin("Inspector", nullptr, window_flags);
-        ImGui::Text("RMB: rotate the camera");
-        ImGui::Text("WASDQE: move the camera");
-        ImGui::Separator();
-        if (ImGui::Checkbox("Enable HDR EnvMap", &enableEnvMap)) {
-            camera.LoopNum = 0;
-        }
-        if (enableEnvMap) {
-            if (ImGui::SliderFloat("Env Invensity", &envInvensity, 0, 10)) {
-                camera.LoopNum = 0;
-            }
-            if (ImGui::SliderFloat("Env Angle", &envAngle, -1, 1)) {
-                camera.LoopNum = 0;
-            }
-        }
-        if (ImGui::Checkbox("Enable Multi-Important Sampling", &enableMultiImportantSample)) {
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderInt("Max Bounce", &maxBounce, 1, MAX_BOUNCE)) {
-            camera.LoopNum = 0;
-        }
-        ImGui::Separator();
-        ImGui::Text("Screen Buffer Size: (%d x %d)", width, height);
-        ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
-        if (ImGui::SliderInt("Max Iterations", &maxIterations, -1, 3000)) {
-            camera.LoopNum = 0;
-        }
-        ImGui::SameLine(); Helper("-1: No Limit");
-        ImGui::Text("Iterations: %d / %d", camera.LoopNum, maxIterations);
-        ImGui::Separator();
-        if (ImGui::InputFloat3("Camera Position", cameraPosition)) {
-            camera.Position = vec3(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
-            camera.Refresh();
-        }
-        if (ImGui::InputFloat3("Camera Rotation", cameraRotation)) {
-            camera.Rotation = vec3(cameraRotation[0], cameraRotation[1], cameraRotation[2]);
-            camera.Refresh();
-        }
-        if (ImGui::SliderFloat("Camera Zoom", &cameraZoom, 1.0f, 45.0f)) {
-            camera.Zoom = cameraZoom;
-            camera.Refresh();
-        }
-        ImGui::Separator();
-        ImGui::Checkbox("Enable ToneMapping", &enableToneMapping);
-        ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
-        ImGui::Separator();
-        // ImGui::Checkbox("Demo Window", &show_demo_window);
-        // if (show_demo_window)
-        //     ImGui::ShowDemoWindow(&show_demo_window);
-        if (ImGui::Button("Save Image")) {
-            SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + "_spp.png", width, height);
-        }
-        ImGui::Separator();
-        if (ImGui::Checkbox("Enable BSDF Properties", &enableBSDF)) {
-            camera.LoopNum = 0;
-        }
-        if (ImGui::ColorEdit3("Base Color", baseColor)) {
-            current_material.baseColor = vec3(baseColor[0], baseColor[1], baseColor[2]);
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderFloat("Subsurface", &subsurface, 0.0f, 1.0f)) {
-            current_material.subsurface = subsurface;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
-            current_material.metallic = metallic;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
-            current_material.roughness = roughness;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (!enableBSDF) {
-            if (ImGui::SliderFloat("Specular", &specular, 0.0f, 1.0f)) {
-                current_material.specular = specular;
-                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-                camera.LoopNum = 0;
-            }
-        }
-        if (ImGui::SliderFloat("Specular Tint", &specularTint, 0.0f, 1.0f)) {
-            current_material.specularTint = specularTint;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderFloat("Anisotropic", &anisotropic, 0.0f, 1.0f)) {
-            current_material.anisotropic = anisotropic;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::ColorEdit3("Emissive", emissive)) {
-            current_material.emissive = vec3(emissive[0], emissive[1], emissive[2]);
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderFloat("Sheen", &sheen, 0.0f, 1.0f)) {
-            current_material.sheen = sheen;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderFloat("Sheen Tint", &sheenTint, 0.0f, 1.0f)) {
-            current_material.sheenTint = sheenTint;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderFloat("Clearcoat", &clearcoat, 0.0f, 1.0f)) {
-            current_material.clearcoat = clearcoat;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (ImGui::SliderFloat("Clearcoat Gloss", &clearcoatGloss, 0.0f, 1.0f)) {
-            current_material.clearcoatGloss = clearcoatGloss;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
-        }
-        if (enableBSDF) {
-            if (ImGui::SliderFloat("IOR", &IOR, 0.001f, 2.45f)) {
-                current_material.IOR = IOR;
-                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-                camera.LoopNum = 0;
-            }
-            if (ImGui::SliderFloat("Transmission", &transmission, 0.0f, 1.0f)) {
-                current_material.transmission = transmission;
-                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-                camera.LoopNum = 0;
-            }
-            if (ImGui::Combo("Medium Type", &mediumType, "None\0Absorb\0Scatter\0Emissive\0\0")) {
-                current_material.mediumType = (float)mediumType;
-                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-                camera.LoopNum = 0;
-            }
-            if (ImGui::ColorEdit3("Medium Color", mediumColor)) {
-                current_material.mediumColor = vec3(mediumColor[0], mediumColor[1], mediumColor[2]);
-                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-                camera.LoopNum = 0;
-            }
-            if (ImGui::SliderFloat("Medium Density", &mediumDensity, 0, 1)) {
-                current_material.mediumDensity = mediumDensity;
-                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-                camera.LoopNum = 0;
-            }
-            if (ImGui::SliderFloat("Medium Anisotropy", &mediumAnisotropy, 0, 1)) {
-                current_material.mediumAnisotropy = mediumAnisotropy;
-                RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-                camera.LoopNum = 0;
-            }
-        }
-
-        ImGui::End();
+        OnGUI(triangles_encoded, tbo0);
 
         if (maxIterations == -1 || camera.LoopNum < maxIterations) { camera.LoopIncrease(); }
 
+        // Ray Tracer Shader
         {
             screenBuffer.setCurrentBuffer(camera.LoopNum);
-
-            RayTracerShader.setInt("hdrResolution", hdrResolution);
-            RayTracerShader.setInt("historyTexture", 0);
-
-            glActiveTexture(GL_TEXTURE0 + 1);
-            glBindTexture(GL_TEXTURE_BUFFER, trianglesTextureBuffer);
-            RayTracerShader.setInt("triangles", 1);
-
-            glActiveTexture(GL_TEXTURE0 + 2);
-            glBindTexture(GL_TEXTURE_BUFFER, nodesTextureBuffer);
-            RayTracerShader.setInt("nodes", 2);
-
-            glActiveTexture(GL_TEXTURE0 + 3);
-            glBindTexture(GL_TEXTURE_2D, hdrMap);
-            RayTracerShader.setInt("hdrMap", 3);
-
-            glActiveTexture(GL_TEXTURE0 + 4);
-            glBindTexture(GL_TEXTURE_2D, hdrCache);
-            RayTracerShader.setInt("hdrCache", 4);
 
             RayTracerShader.use();
             RayTracerShader.setVec3("camera.position", camera.Position);
@@ -612,7 +294,7 @@ int main() {
             RayTracerShader.setInt("screenHeight", height);
             RayTracerShader.setBool("enableMultiImportantSample", enableMultiImportantSample);
             RayTracerShader.setBool("enableEnvMap", enableEnvMap);
-            RayTracerShader.setFloat("envInvensity", envInvensity);
+            RayTracerShader.setFloat("envIntensity", envIntensity);
             RayTracerShader.setFloat("envAngle", envAngle);
             RayTracerShader.setInt("maxBounce", maxBounce);
             RayTracerShader.setInt("maxIterations", maxIterations);
@@ -620,6 +302,7 @@ int main() {
             screen.DrawScreen();
         }
 
+        // Screen Shader
         {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
@@ -631,8 +314,8 @@ int main() {
             screen.DrawScreen();
         }
 
-        if (enableToneMapping)
-        {
+        // ToneMapping Shader
+        if (enableToneMapping) {
             glBindFramebuffer(GL_FRAMEBUFFER, 0);
             glClearColor(0, 0, 0, 1.0f);
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -645,6 +328,7 @@ int main() {
             screen.DrawScreen();
         }
 
+        // Compute Shader
 #ifndef __APPLE__
         // {
         //     CompShader.use();
@@ -661,6 +345,7 @@ int main() {
         //     screen.DrawScreen();
         // }
 #endif
+
 
         ImGui::Render();
         ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
@@ -698,9 +383,7 @@ void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
         camera.ProcessKeyboard(DOWN, deltaTime);
 
-    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS){
-        int width = 0;
-        int height = 0;
+    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
         glfwGetFramebufferSize(window, &width, &height);
         SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + "_spp.png", width, height);
     }
@@ -740,7 +423,178 @@ void mouse_callback(GLFWwindow *window, double xposIn, double yposIn) {
     }
 }
 
-void scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
+void mouse_scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
     // camera.ProcessMouseScroll(static_cast<float>(yoffset));
+}
+
+void OnGUI(vector<Triangle_encoded> &triangles_encoded, GLuint tbo0) {
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplGlfw_NewFrame();
+    ImGui::NewFrame();
+
+    glfwGetFramebufferSize(window, &width, &height);
+    ImGuiWindowFlags window_flags = 0;
+    window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+#if __APPLE__
+    ImGui::SetNextWindowSizeConstraints(ImVec2(10,10), ImVec2(width, height / 2.0 - 20));
+#else
+    ImGui::SetNextWindowSizeConstraints(ImVec2(10, 10), ImVec2(width, height - 20));
+#endif
+
+    ImGui::Begin("Inspector", nullptr, window_flags);
+    ImGui::Text("RMB: rotate the camera");
+    ImGui::Text("WASDQE: move the camera");
+    ImGui::Separator();
+    if (ImGui::Checkbox("Enable HDR EnvMap", &enableEnvMap)) {
+        camera.LoopNum = 0;
+    }
+    if (enableEnvMap) {
+        if (ImGui::SliderFloat("Env Intensity", &envIntensity, 0, 10)) {
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Env Angle", &envAngle, -1, 1)) {
+            camera.LoopNum = 0;
+        }
+    }
+    if (ImGui::Checkbox("Enable Multi-Important Sampling", &enableMultiImportantSample)) {
+        camera.LoopNum = 0;
+    }
+    if (ImGui::SliderInt("Max Bounce", &maxBounce, 1, MAX_BOUNCE)) {
+        camera.LoopNum = 0;
+    }
+    ImGui::Separator();
+    ImGui::Text("Screen Buffer Size: (%d x %d)", width, height);
+    ImGui::Text("Average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+    if (ImGui::SliderInt("Max Iterations", &maxIterations, -1, 3000)) {
+        camera.LoopNum = 0;
+    }
+    ImGui::SameLine();
+    Helper("-1: No Limit");
+    ImGui::Text("Iterations: %d / %d", camera.LoopNum, maxIterations);
+    ImGui::Separator();
+    if (ImGui::InputFloat3("Camera Position", cameraPosition)) {
+        camera.Position = vec3(cameraPosition[0], cameraPosition[1], cameraPosition[2]);
+        camera.Refresh();
+    }
+    if (ImGui::InputFloat3("Camera Rotation", cameraRotation)) {
+        camera.Rotation = vec3(cameraRotation[0], cameraRotation[1], cameraRotation[2]);
+        camera.Refresh();
+    }
+    if (ImGui::SliderFloat("Camera Zoom", &cameraZoom, 1.0f, 45.0f)) {
+        camera.Zoom = cameraZoom;
+        camera.Refresh();
+    }
+    ImGui::Separator();
+    ImGui::Checkbox("Enable ToneMapping", &enableToneMapping);
+    ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
+    ImGui::Separator();
+
+    // ImGui::Checkbox("Demo Window", &show_demo_window);
+    // if (show_demo_window)
+    //     ImGui::ShowDemoWindow(&show_demo_window);
+
+    if (ImGui::Button("Save Image")) {
+        SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + "_spp.png", width, height);
+    }
+    ImGui::Separator();
+    if (ImGui::Checkbox("Enable BSDF Properties", &enableBSDF)) {
+        camera.LoopNum = 0;
+    }
+    if (ImGui::ColorEdit3("Base Color", baseColor)) {
+        current_material.baseColor = vec3(baseColor[0], baseColor[1], baseColor[2]);
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (ImGui::SliderFloat("Subsurface", &subsurface, 0.0f, 1.0f)) {
+        current_material.subsurface = subsurface;
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
+        current_material.metallic = metallic;
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
+        current_material.roughness = roughness;
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (!enableBSDF) {
+        if (ImGui::SliderFloat("Specular", &specular, 0.0f, 1.0f)) {
+            current_material.specular = specular;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+    }
+    if (ImGui::SliderFloat("Specular Tint", &specularTint, 0.0f, 1.0f)) {
+        current_material.specularTint = specularTint;
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (ImGui::SliderFloat("Anisotropic", &anisotropic, 0.0f, 1.0f)) {
+        current_material.anisotropic = anisotropic;
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (ImGui::ColorEdit3("Emissive", emissive)) {
+        current_material.emissive = vec3(emissive[0], emissive[1], emissive[2]);
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (ImGui::SliderFloat("Sheen", &sheen, 0.0f, 1.0f)) {
+        current_material.sheen = sheen;
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (ImGui::SliderFloat("Sheen Tint", &sheenTint, 0.0f, 1.0f)) {
+        current_material.sheenTint = sheenTint;
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (ImGui::SliderFloat("Clearcoat", &clearcoat, 0.0f, 1.0f)) {
+        current_material.clearcoat = clearcoat;
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (ImGui::SliderFloat("Clearcoat Gloss", &clearcoatGloss, 0.0f, 1.0f)) {
+        current_material.clearcoatGloss = clearcoatGloss;
+        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+        camera.LoopNum = 0;
+    }
+    if (enableBSDF) {
+        if (ImGui::SliderFloat("IOR", &IOR, 0.001f, 2.45f)) {
+            current_material.IOR = IOR;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Transmission", &transmission, 0.0f, 1.0f)) {
+            current_material.transmission = transmission;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::Combo("Medium Type", &mediumType, "None\0Absorb\0Scatter\0Emissive\0\0")) {
+            current_material.mediumType = (float) mediumType;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::ColorEdit3("Medium Color", mediumColor)) {
+            current_material.mediumColor = vec3(mediumColor[0], mediumColor[1], mediumColor[2]);
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Medium Density", &mediumDensity, 0, 1)) {
+            current_material.mediumDensity = mediumDensity;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+        if (ImGui::SliderFloat("Medium Anisotropy", &mediumAnisotropy, 0, 1)) {
+            current_material.mediumAnisotropy = mediumAnisotropy;
+            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
+            camera.LoopNum = 0;
+        }
+    }
+
+    ImGui::End();
 }
 
