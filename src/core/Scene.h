@@ -17,6 +17,10 @@ Material tear_glass_emissive;
 
 Material current_material;
 
+GameObject go_sphere;
+GameObject go_panther;
+GameObject current_game_object;
+
 void InitMaterial();
 void InitMesh();
 void InitHdrEnvMap();
@@ -25,10 +29,11 @@ void InitScene() {
 
     InitMaterial();
 
-    current_material = tear_glass_emissive;
+    current_material = copper;
     SetGlobalMaterialProperty(current_material);
 
     InitMesh();
+    current_game_object = go_panther;
 
     nTriangles = triangles.size();
     std::cout << "Scene loading completed: " << nTriangles << " triangle faces in total" << std::endl;
@@ -108,9 +113,9 @@ void InitMesh() {
     // getTriangle(teapot.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0,0,0), vec3(2.6, -2.0, 3), vec3(2.5)), true);
 
-    Model sphere("../../resources/objects/sphere2.obj");
-    getTriangle(sphere.meshes, triangles, current_material,
-                getTransformMatrix(vec3(0, 90, 0), vec3(1.8, -1, 3), vec3(2)), true);
+    // Model sphere("../../resources/objects/sphere2.obj");
+    // go_sphere.triangleIndex = getTriangle(sphere.meshes, triangles, current_material,
+    //             getTransformMatrix(vec3(0, 90, 0), vec3(1.8, -1, 3), vec3(2)), true);
 
     // Model loong("../../resources/objects/loong.obj");        // 100000 face
     // getTriangle(loong.meshes, triangles, current_material,
@@ -121,9 +126,9 @@ void InitMesh() {
     // getTriangle(dragon.meshes, triangles, current_material,
     //             getTransformMatrix(vec3(0, 130, 0), vec3(-0.2, -1.8, 3), vec3(3)), true);
 
-    // Model panther("../../resources/objects/panther.obj");     // 831812 face
-    // getTriangle(panther.meshes, triangles, current_material,
-    //             getTransformMatrix(vec3(0, -30, 0), vec3(0.9, -2.1, 5), vec3(5)), true);
+    Model panther("../../resources/objects/panther_100000.obj");     // 100000 face
+    go_panther.triangleIndex = getTriangle(panther.meshes, triangles, current_material,
+                getTransformMatrix(vec3(0, -30, 0), vec3(0.8, -2.2, 5), vec3(4.5)), true);
 
     // Model boy_body("../../resources/objects/substance_boy/body.obj");
     // getTriangle(boy_body.meshes, triangles, current_material,
@@ -137,7 +142,8 @@ void InitMesh() {
 void InitHdrEnvMap() {
     // HDR Environment Map
     // -------------------
-    bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_1k.hdr", hdrRes);
+    // bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_1k.hdr", hdrRes);
+    bool r = HDRLoader::load("../../resources/textures/hdr/peppermint_powerplant_4k.hdr", hdrRes);
     // bool r = HDRLoader::load("../../resources/textures/hdr/sunset.hdr", hdrRes);
 
     hdrMap = getTextureRGB32F(hdrRes.width, hdrRes.height);

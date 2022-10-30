@@ -14,6 +14,11 @@
 
 #include <vector>
 
+struct TriangleIndex {
+    int left;
+    int right;
+};
+
 struct Triangle {
     glm::vec3 p1, p2, p3;   // 顶点坐标
     glm::vec3 n1, n2, n3;   // 顶点法线
@@ -33,7 +38,7 @@ struct Triangle_encoded {
     glm::vec3 param5;        // offset:13 (mediumType, mediumDensity, mediumAnisotropy)
 };
 
-void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Material material, mat4 trans, bool smoothNormal = false) {
+TriangleIndex getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Material material, mat4 trans, bool smoothNormal = false) {
     // 顶点位置，索引
     std::vector<vec3> vertices;
     std::vector<vec3> normals;
@@ -117,11 +122,17 @@ void getTriangle(std::vector<Mesh> &data, std::vector<Triangle> &triangles, Mate
         // 传材质
         t.material = material;
     }
+
+    TriangleIndex triangleIndex {};
+    triangleIndex.left = offset;
+    triangleIndex.right = triangles.size();
+
+    return triangleIndex;
 }
 
-void RefreshTriangleMaterial(vector<Triangle> &triangles, vector<Triangle_encoded> &triangles_encoded, Material m, GLuint tbo, GLuint textureBuffer) {
+void RefreshTriangleMaterial(TriangleIndex triangleIndex, vector<Triangle> &triangles, vector<Triangle_encoded> &triangles_encoded, Material m, GLuint tbo, GLuint textureBuffer) {
     int n = triangles.size();
-    for (int i = 1; i < n-1; i++) {
+    for (int i = triangleIndex.left; i < triangleIndex.right-1; i++) {
         Triangle &t = triangles[i];
         t.material = m;
         triangles_encoded[i].emissive = m.emissive;

@@ -27,6 +27,7 @@
 #include "Triangle.h"
 #include "BVH.h"
 #include "Utility.h"
+#include "GameObeject.h"
 
 #include "hdrloader.h"
 
@@ -129,6 +130,7 @@ int main() {
     // Encode Triangle Data
     // --------------------
     std::vector<Triangle_encoded> triangles_encoded(nTriangles);
+    triangles_encoded_ptr = &triangles_encoded;
     for (int i = 0; i < nTriangles; i++) {
         Triangle &t = triangles[i];
         Material &m = t.material;
@@ -154,6 +156,7 @@ int main() {
     // Encode BVHNode and AABB
     // -----------------------
     std::vector<BVHNode_encoded> nodes_encoded(nNodes);
+    nodes_encoded_ptr = &nodes_encoded;
     for (int i = 0; i < nNodes; i++) {
         nodes_encoded[i].childs = vec3(nodes[i].left, nodes[i].right, 0);
         nodes_encoded[i].leafInfo = vec3(nodes[i].n, nodes[i].index, 0);
@@ -163,20 +166,18 @@ int main() {
 
     // Triangle Texture Buffer
     // -----------------------
-    GLuint tbo0;
     glGenBuffers(1, &tbo0);
     glBindBuffer(GL_TEXTURE_BUFFER, tbo0);
-    glBufferData(GL_TEXTURE_BUFFER, triangles_encoded.size() * sizeof(Triangle_encoded), &triangles_encoded[0], GL_STATIC_DRAW);
+    glBufferData(GL_TEXTURE_BUFFER, triangles_encoded_ptr->size() * sizeof(Triangle_encoded), &triangles_encoded[0], GL_STATIC_DRAW);
     glGenTextures(1, &trianglesTextureBuffer);
     glBindTexture(GL_TEXTURE_BUFFER, trianglesTextureBuffer);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo0);
 
     // BVHNode Texture Buffer
     // -----------------------
-    GLuint tbo1;
     glGenBuffers(1, &tbo1);
     glBindBuffer(GL_TEXTURE_BUFFER, tbo1);
-    glBufferData(GL_TEXTURE_BUFFER, nodes_encoded.size() * sizeof(BVHNode_encoded), &nodes_encoded[0], GL_STATIC_DRAW);
+    glBufferData(GL_TEXTURE_BUFFER, nodes_encoded_ptr->size() * sizeof(BVHNode_encoded), &nodes_encoded[0], GL_STATIC_DRAW);
     glGenTextures(1, &nodesTextureBuffer);
     glBindTexture(GL_TEXTURE_BUFFER, nodesTextureBuffer);
     glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo1);
@@ -427,6 +428,11 @@ void mouse_scroll_callback(GLFWwindow *window, double xoffset, double yoffset) {
     // camera.ProcessMouseScroll(static_cast<float>(yoffset));
 }
 
+void setDirty() {
+    RefreshTriangleMaterial(current_game_object.triangleIndex, triangles, *triangles_encoded_ptr, current_material, tbo0, trianglesTextureBuffer);
+    camera.LoopNum = 0;
+}
+
 void OnGUI(vector<Triangle_encoded> &triangles_encoded, GLuint tbo0) {
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplGlfw_NewFrame();
@@ -502,96 +508,78 @@ void OnGUI(vector<Triangle_encoded> &triangles_encoded, GLuint tbo0) {
     }
     if (ImGui::ColorEdit3("Base Color", baseColor)) {
         current_material.baseColor = vec3(baseColor[0], baseColor[1], baseColor[2]);
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (ImGui::SliderFloat("Subsurface", &subsurface, 0.0f, 1.0f)) {
         current_material.subsurface = subsurface;
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (ImGui::SliderFloat("Metallic", &metallic, 0.0f, 1.0f)) {
         current_material.metallic = metallic;
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (ImGui::SliderFloat("Roughness", &roughness, 0.0f, 1.0f)) {
         current_material.roughness = roughness;
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (!enableBSDF) {
         if (ImGui::SliderFloat("Specular", &specular, 0.0f, 1.0f)) {
             current_material.specular = specular;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
+            setDirty();
         }
     }
     if (ImGui::SliderFloat("Specular Tint", &specularTint, 0.0f, 1.0f)) {
         current_material.specularTint = specularTint;
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (ImGui::SliderFloat("Anisotropic", &anisotropic, 0.0f, 1.0f)) {
         current_material.anisotropic = anisotropic;
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (ImGui::ColorEdit3("Emissive", emissive)) {
         current_material.emissive = vec3(emissive[0], emissive[1], emissive[2]);
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (ImGui::SliderFloat("Sheen", &sheen, 0.0f, 1.0f)) {
         current_material.sheen = sheen;
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (ImGui::SliderFloat("Sheen Tint", &sheenTint, 0.0f, 1.0f)) {
         current_material.sheenTint = sheenTint;
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (ImGui::SliderFloat("Clearcoat", &clearcoat, 0.0f, 1.0f)) {
         current_material.clearcoat = clearcoat;
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (ImGui::SliderFloat("Clearcoat Gloss", &clearcoatGloss, 0.0f, 1.0f)) {
         current_material.clearcoatGloss = clearcoatGloss;
-        RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-        camera.LoopNum = 0;
+        setDirty();
     }
     if (enableBSDF) {
         if (ImGui::SliderFloat("IOR", &IOR, 0.001f, 2.45f)) {
             current_material.IOR = IOR;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
+            setDirty();
         }
         if (ImGui::SliderFloat("Transmission", &transmission, 0.0f, 1.0f)) {
             current_material.transmission = transmission;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
+            setDirty();
         }
         if (ImGui::Combo("Medium Type", &mediumType, "None\0Absorb\0Scatter\0Emissive\0\0")) {
             current_material.mediumType = (float) mediumType;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
+            setDirty();
         }
         if (ImGui::ColorEdit3("Medium Color", mediumColor)) {
             current_material.mediumColor = vec3(mediumColor[0], mediumColor[1], mediumColor[2]);
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
+            setDirty();
         }
         if (ImGui::SliderFloat("Medium Density", &mediumDensity, 0, 1)) {
             current_material.mediumDensity = mediumDensity;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
+            setDirty();
         }
         if (ImGui::SliderFloat("Medium Anisotropy", &mediumAnisotropy, 0, 1)) {
             current_material.mediumAnisotropy = mediumAnisotropy;
-            RefreshTriangleMaterial(triangles, triangles_encoded, current_material, tbo0, trianglesTextureBuffer);
-            camera.LoopNum = 0;
+            setDirty();
         }
     }
 

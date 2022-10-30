@@ -48,6 +48,9 @@ std::vector<Triangle> triangles;
 // Triangle Texture Buffer Data
 GLuint trianglesTextureBuffer;
 
+std::vector<Triangle_encoded> *triangles_encoded_ptr;
+std::vector<BVHNode_encoded> *nodes_encoded_ptr;
+
 int nNodes;
 
 // BVH Node Texture Buffer Data
@@ -58,6 +61,10 @@ GLuint hdrMap;
 GLuint hdrCache;
 HDRLoaderResult hdrRes;
 int hdrResolution;
+
+
+GLuint tbo0;
+GLuint tbo1;
 
 // Compute Shader Output Image
 GLuint tex_output;
