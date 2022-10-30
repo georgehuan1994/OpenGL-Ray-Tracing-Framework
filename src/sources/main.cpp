@@ -112,109 +112,6 @@ int main() {
     // ----------
     InitScene();
 
-    // Build BVH Node Data
-    // -------------------
-    BVHNode bvhTestNode;
-    bvhTestNode.left = 255;
-    bvhTestNode.right = 128;
-    bvhTestNode.n = 30;
-    bvhTestNode.AA = vec3(1, 1, 0);
-    bvhTestNode.BB = vec3(0, 1, 0);
-    std::vector<BVHNode> nodes{bvhTestNode};
-    // buildBVH(triangles, nodes, 0, triangles.size() - 1, 8);
-    buildBVHwithSAH(triangles, nodes, 0, triangles.size() - 1, 8);
-
-    nNodes = nodes.size();
-    std::cout << "BVH building completed: " << nNodes << " nodes in total" << std::endl;
-
-    // Encode Triangle Data
-    // --------------------
-    std::vector<Triangle_encoded> triangles_encoded(nTriangles);
-    triangles_encoded_ptr = &triangles_encoded;
-    for (int i = 0; i < nTriangles; i++) {
-        Triangle &t = triangles[i];
-        Material &m = t.material;
-        // vertex position
-        triangles_encoded[i].p1 = t.p1;
-        triangles_encoded[i].p2 = t.p2;
-        triangles_encoded[i].p3 = t.p3;
-        // vertex normal
-        triangles_encoded[i].n1 = t.n1;
-        triangles_encoded[i].n2 = t.n2;
-        triangles_encoded[i].n3 = t.n3;
-        // material
-        triangles_encoded[i].emissive = m.emissive;
-        triangles_encoded[i].baseColor = m.baseColor;
-        triangles_encoded[i].param1 = vec3(m.subsurface, m.metallic, m.specular);
-        triangles_encoded[i].param2 = vec3(m.specularTint, m.roughness, m.anisotropic);
-        triangles_encoded[i].param3 = vec3(m.sheen, m.sheenTint, m.clearcoat);
-        triangles_encoded[i].param4 = vec3(m.clearcoatGloss, m.IOR, m.transmission);
-        triangles_encoded[i].mediumColor = m.mediumColor;
-        triangles_encoded[i].param5 = vec3(m.mediumType, m.mediumDensity, m.mediumAnisotropy);
-    }
-
-    // Encode BVHNode and AABB
-    // -----------------------
-    std::vector<BVHNode_encoded> nodes_encoded(nNodes);
-    nodes_encoded_ptr = &nodes_encoded;
-    for (int i = 0; i < nNodes; i++) {
-        nodes_encoded[i].childs = vec3(nodes[i].left, nodes[i].right, 0);
-        nodes_encoded[i].leafInfo = vec3(nodes[i].n, nodes[i].index, 0);
-        nodes_encoded[i].AA = nodes[i].AA;
-        nodes_encoded[i].BB = nodes[i].BB;
-    }
-
-    // Triangle Texture Buffer
-    // -----------------------
-    glGenBuffers(1, &tbo0);
-    glBindBuffer(GL_TEXTURE_BUFFER, tbo0);
-    glBufferData(GL_TEXTURE_BUFFER, triangles_encoded_ptr->size() * sizeof(Triangle_encoded), &triangles_encoded[0], GL_STATIC_DRAW);
-    glGenTextures(1, &trianglesTextureBuffer);
-    glBindTexture(GL_TEXTURE_BUFFER, trianglesTextureBuffer);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo0);
-
-    // BVHNode Texture Buffer
-    // -----------------------
-    glGenBuffers(1, &tbo1);
-    glBindBuffer(GL_TEXTURE_BUFFER, tbo1);
-    glBufferData(GL_TEXTURE_BUFFER, nodes_encoded_ptr->size() * sizeof(BVHNode_encoded), &nodes_encoded[0], GL_STATIC_DRAW);
-    glGenTextures(1, &nodesTextureBuffer);
-    glBindTexture(GL_TEXTURE_BUFFER, nodesTextureBuffer);
-    glTexBuffer(GL_TEXTURE_BUFFER, GL_RGB32F, tbo1);
-
-#ifndef __APPLE__
-    // // dimensions of the image
-    // glGenTextures(1, &tex_output);
-    // glActiveTexture(GL_TEXTURE0);
-    // glBindTexture(GL_TEXTURE_2D, tex_output);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    // glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    // glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
-    // glBindImageTexture(0, tex_output, 0, GL_FALSE, 0, GL_WRITE_ONLY, GL_RGBA32F);
-
-    int work_grp_cnt[3];
-
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 0, &work_grp_cnt[0]);
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 1, &work_grp_cnt[1]);
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_COUNT, 2, &work_grp_cnt[2]);
-
-    printf("max global (total) work group counts x:%i y:%i z:%i\n",
-           work_grp_cnt[0], work_grp_cnt[1], work_grp_cnt[2]);
-
-    int work_grp_size[3];
-
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 0, &work_grp_size[0]);
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 1, &work_grp_size[1]);
-    glGetIntegeri_v(GL_MAX_COMPUTE_WORK_GROUP_SIZE, 2, &work_grp_size[2]);
-
-    printf("max local (in one shader) work group sizes x:%i y:%i z:%i\n",
-           work_grp_size[0], work_grp_size[1], work_grp_size[2]);
-
-    // glGetIntegerv(GL_MAX_COMPUTE_WORK_GROUP_INVOCATIONS, &work_grp_inv);
-    // printf("max local work group invocations %i\n", work_grp_inv);
-#endif
 #pragma endregion
 
     // glEnable(GL_DEPTH_TEST);
@@ -236,7 +133,7 @@ int main() {
     RayTracerShader.use();
 
     RayTracerShader.setInt("nTriangles", nTriangles);
-    RayTracerShader.setInt("nNodes", nodes.size());
+    RayTracerShader.setInt("nNodes", nodes_prt->size());
 
     RayTracerShader.setInt("hdrResolution", hdrResolution);
     RayTracerShader.setInt("historyTexture", 0);
@@ -273,7 +170,7 @@ int main() {
 
         processInput(window);
 
-        OnGUI(triangles_encoded, tbo0);
+        OnGUI(*triangles_encoded_ptr, tbo0);
 
         if (maxIterations == -1 || camera.LoopNum < maxIterations) { camera.LoopIncrease(); }
 
@@ -384,10 +281,6 @@ void processInput(GLFWwindow *window) {
     if (glfwGetKey(window, GLFW_KEY_E) == GLFW_PRESS)
         camera.ProcessKeyboard(DOWN, deltaTime);
 
-    if (glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS) {
-        glfwGetFramebufferSize(window, &width, &height);
-        SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + "_spp.png", width, height);
-    }
     for (int i = 0; i < 3; ++i) {
         cameraPosition[i] = camera.Position[i];
     }
@@ -493,15 +386,11 @@ void OnGUI(vector<Triangle_encoded> &triangles_encoded, GLuint tbo0) {
     ImGui::Separator();
     ImGui::Checkbox("Enable ToneMapping", &enableToneMapping);
     ImGui::Checkbox("Enable Gamma Correction", &enableGammaCorrection);
-    ImGui::Separator();
 
     // ImGui::Checkbox("Demo Window", &show_demo_window);
     // if (show_demo_window)
     //     ImGui::ShowDemoWindow(&show_demo_window);
 
-    if (ImGui::Button("Save Image")) {
-        SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + "_spp.png", width, height);
-    }
     ImGui::Separator();
     if (ImGui::Checkbox("Enable BSDF Properties", &enableBSDF)) {
         camera.LoopNum = 0;
@@ -581,6 +470,10 @@ void OnGUI(vector<Triangle_encoded> &triangles_encoded, GLuint tbo0) {
             current_material.mediumAnisotropy = mediumAnisotropy;
             setDirty();
         }
+    }
+
+    if (ImGui::Button("Save Image")) {
+        SaveFrame("../../screenshot/screenshot_" + to_string(camera.LoopNum) + "_spp.png", width, height);
     }
 
     ImGui::End();

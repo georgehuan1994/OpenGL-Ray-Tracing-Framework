@@ -7,7 +7,9 @@
 
 class GameObject {
 public:
+    bool active = false;
     TriangleIndex triangleIndex;
+
     GameObject() { }
 };
 

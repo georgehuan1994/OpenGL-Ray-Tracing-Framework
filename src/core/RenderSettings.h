@@ -51,6 +51,8 @@ GLuint trianglesTextureBuffer;
 std::vector<Triangle_encoded> *triangles_encoded_ptr;
 std::vector<BVHNode_encoded> *nodes_encoded_ptr;
 
+std::vector<BVHNode> *nodes_prt;
+
 int nNodes;
 
 // BVH Node Texture Buffer Data
