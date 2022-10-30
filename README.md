@@ -2,6 +2,10 @@
 
 ![screenshot_bunny.png](https://raw.githubusercontent.com/georgehuan1994/OpenGL-Ray-Tracing-Framework/main/screenshot/screenshot_bunny.png)
 
+Cover Obj: [stanford bunny (4000 triangles)](https://github.com/georgehuan1994/OpenGL-Ray-Tracing-Framework/blob/main/resources/objects/bunny_4000.obj)
+
+Cover Material: jade (baseColor: 0.55, 0.78, 0.55 / IOR = 1.79 / subsurface = 1.0)
+
 After [《Ray Tracing in One Weekend Book Series》](https://github.com/RayTracing/raytracing.github.io) and [《LearnOpenGL》](https://github.com/JoeyDeVries/LearnOpenGL), is time to make ray-tracing in GLSL.
 
 ## Reference
@@ -41,3 +45,17 @@ After [《Ray Tracing in One Weekend Book Series》](https://github.com/RayTraci
 - [ ] Material Instances
 - [ ] Scene Manager
 - [ ] Gizmo
+
+## ScreenShot
+
+Obj: [loong (100000 triangles)](https://github.com/georgehuan1994/OpenGL-Ray-Tracing-Framework/blob/main/resources/objects/loong_100000.obj)
+
+Material: copper (baseColor: 0.93, 0.62, 0.53 / IOR = 1.21901 / roughness = 0.2 / metallic = 1.0)
+
+![screenshot_loong.png](https://raw.githubusercontent.com/georgehuan1994/OpenGL-Ray-Tracing-Framework/main/screenshot/screenshot_loong.png)
+
+Obj: [panther (100000 triangles)](https://github.com/georgehuan1994/OpenGL-Ray-Tracing-Framework/blob/main/resources/objects/panther_100000.obj)
+
+Material: brown_glass (baseColor: 1.0 / IOR = 1.45 / roughness = 0.1 / mediumType = ABSORB / mediumColor = 0.905, 0.63, 0.3 / mediumDensity = 1)
+
+![screenshot_panther.png](https://raw.githubusercontent.com/georgehuan1994/OpenGL-Ray-Tracing-Framework/main/screenshot/screenshot_panther.png)
